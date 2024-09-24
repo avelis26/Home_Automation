@@ -1,11 +1,10 @@
----
 - hosts: localhost
   become: yes
   vars_files:
     - secrets.yml
     - ssh_keys.yml
   tasks:
-    # Base package installation
+    # Packages
     - name: Install base packages
       apt:
         name:
@@ -26,46 +25,31 @@
           - make
         state: present
         update_cache: yes
-
-    # SSH key setup
-    - name: Create .ssh directory
-      file:
-        path: /home/avelis/.ssh
-        state: directory
-        mode: "0700"
-        owner: avelis
-        group: avelis
-
+    # SSH
     - name: Add SSH authorized keys
-      lineinfile:
-        path: /home/avelis/.ssh/authorized_keys
-        line: "{{ item }}"
-        create: yes
-        owner: avelis
-        group: avelis
-        mode: "0600"
+      authorized_key:
+        user: avelis
+        key: "{{ item }}"
       loop: "{{ ssh_keys }}"
-
-    # Bashrc customization
-    - name: Add aliases and export to bashrc
+    # Bashrc
+    - name: Update BASHRC
       lineinfile:
         path: /home/avelis/.bashrc
         line: "{{ item }}"
+        create: yes
+        insertafter: EOF
       loop:
         - 'alias ls="ls -lhAp --color=always"'
         - 'alias ll="ls -lhAp --color=always"'
         - 'alias update="sudo apt update -y && sudo apt full-upgrade -y && sudo apt autoremove -y"'
         - 'alias nvtop="gpustat -a -i 1"'
         - 'export PATH="$PATH:/home/avelis/.local/bin"'
-
-    # Samba setup
-    - name: Setup Samba user
-      user:
-        name: samba
-        state: present
-        password: "{{ samba_password }}"
-
-    - name: Configure Samba shares
+    # Samba
+    - name: Create Samba user
+      command: "echo -e '{{ samba_password }}\n{{ samba_password }}' | smbpasswd -a samba"
+      args:
+        creates: /var/lib/samba/private/passdb.tdb
+    - name: Configure Samba share
       blockinfile:
         path: /etc/samba/smb.conf
         block: |
@@ -73,48 +57,53 @@
              path = /mnt/data
              read only = no
              valid users = samba
-
-    - name: Ensure Samba directory exists
+    - name: Set Samba directory
       file:
         path: /mnt/data
         state: directory
         owner: avelis
         group: samba
         mode: "0777"
-
-    # Fstab configuration
-    - name: Ensure fstab entry for /mnt/data
+    # Fstab
+    - name: Edit FSTAB
       mount:
         path: /mnt/data
         src: /dev/mapper/vg_data-lv_data
         fstype: ext4
         opts: defaults
         state: mounted
-
-    # Transmission config
-    - name: Check if Transmission is installed
-      package:
-        name: transmission-daemon
-        state: present
-      register: transmission_installed
-
+    # Transmission
     - name: Stop Transmission Daemon
       systemd:
         name: transmission-daemon
         state: stopped
-      when: transmission_installed.changed
-
-    - name: Update Transmission settings
-      copy:
+    - name: Set Transmission settings
+      template:
         src: transmission_settings.json
         dest: /etc/transmission-daemon/settings.json
         owner: debian-transmission
         group: debian-transmission
         mode: "0644"
       notify: Restart Transmission
-      when: transmission_installed.changed
-
+    - name: Enable Transmission Daemon
+      systemd:
+        name: transmission-daemon
+        enabled: yes
+    # NVIDIA
+    - name: Install NVIDIA driver
+      apt:
+        name: "nvidia-driver-550"
+        state: present
+        update_cache: yes
+      notify: Reboot system
   handlers:
+    - name: Reboot system
+      reboot:
+        msg: "Rebooting system to load NVIDIA driver"
+        connect_timeout: 5
+        reboot_timeout: 300
+        pre_reboot_delay: 5
+        post_reboot_delay: 10
     - name: Restart Transmission
       systemd:
         name: transmission-daemon
