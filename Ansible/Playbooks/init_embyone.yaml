@@ -1,0 +1,138 @@
+---
+- hosts: localhost
+  become: yes
+  vars_files:
+    - secrets.yaml
+    - ssh_keys.yaml
+  tasks:
+    # Base package installation
+    - name: Install base packages
+      apt:
+        name:
+          - htop
+          - gpustat
+          - nano
+          - ffmpeg
+          - iputils-ping
+          - btop
+          - samba
+          - transmission-daemon
+          - curl
+          - git
+          - python3-full
+          - whois
+          - traceroute
+          - gcc
+          - make
+        state: present
+        update_cache: yes
+
+    # SSH key setup
+    - name: Create .ssh directory
+      file:
+        path: /home/avelis/.ssh
+        state: directory
+        mode: '0700'
+        owner: avelis
+        group: avelis
+
+    - name: Add SSH authorized keys
+      lineinfile:
+        path: /home/avelis/.ssh/authorized_keys
+        line: "{{ item }}"
+        create: yes
+        owner: avelis
+        group: avelis
+        mode: '0600'
+      loop: "{{ ssh_keys }}"
+
+    # Bashrc customization
+    - name: Add aliases and export to bashrc
+      lineinfile:
+        path: /home/avelis/.bashrc
+        line: "{{ item }}"
+      loop:
+        - 'alias ls="ls -lhAp --color=always"'
+        - 'alias ll="ls -lhAp --color=always"'
+        - 'alias update="sudo apt update -y && sudo apt full-upgrade -y && sudo apt autoremove -y"'
+        - 'alias nvtop="gpustat -a -i 1"'
+        - 'export PATH="$PATH:/home/avelis/.local/bin"'
+
+    # Samba setup
+    - name: Setup Samba user
+      user:
+        name: samba
+        state: present
+        password: "{{ samba_password }}"
+        
+    - name: Configure Samba shares
+      blockinfile:
+        path: /etc/samba/smb.conf
+        block: |
+          [data]
+             path = /mnt/data
+             read only = no
+             valid users = samba
+
+    - name: Ensure Samba directory exists
+      file:
+        path: /mnt/data
+        state: directory
+        owner: avelis
+        group: samba
+        mode: '0777'
+
+    # Fstab configuration
+    - name: Ensure fstab entry for /mnt/data
+      mount:
+        path: /mnt/data
+        src: /dev/mapper/vg_data-lv_data
+        fstype: ext4
+        opts: defaults
+        state: mounted
+
+    # Install and configure Emby
+    - name: Download Emby
+      get_url:
+        url: https://github.com/MediaBrowser/Emby.Releases/releases/download/4.8.8.0/emby-server-deb_4.8.8.0_amd64.deb
+        dest: /tmp/emby-server-deb_4.8.8.0_amd64.deb
+
+    - name: Install Emby
+      apt:
+        deb: /tmp/emby-server-deb_4.8.8.0_amd64.deb
+
+    - name: Setup Emby directories
+      file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: emby
+        group: emby
+        mode: '0755'
+      loop:
+        - { path: "/var/lib/emby/metadata" }
+        - { path: "/var/lib/emby/temp" }
+        - { path: "/mnt/data/emby/backup" }
+
+    # Transmission config
+    - name: Stop Transmission Daemon
+      systemd:
+        name: transmission-daemon
+        state: stopped
+
+    - name: Update Transmission settings
+      copy:
+        dest: /etc/transmission-daemon/settings.json
+        content: |
+          {
+              "alt-speed-down": 50,
+              ...
+              "rpc-whitelist-enabled": false,
+              ...
+          }
+      notify: Restart Transmission
+
+  handlers:
+    - name: Restart Transmission
+      systemd:
+        name: transmission-daemon
+        state: restarted
