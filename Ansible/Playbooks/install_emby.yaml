@@ -1,0 +1,24 @@
+---
+- hosts: localhost
+  become: yes
+  tasks:
+    - name: Download Emby
+      get_url:
+        url: https://github.com/MediaBrowser/Emby.Releases/releases/download/4.8.8.0/emby-server-deb_4.8.8.0_amd64.deb
+        dest: /tmp/emby-server-deb_4.8.8.0_amd64.deb
+
+    - name: Install Emby
+      apt:
+        deb: /tmp/emby-server-deb_4.8.8.0_amd64.deb
+
+    - name: Setup Emby directories
+      file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: emby
+        group: emby
+        mode: '0755'
+      loop:
+        - { path: "/var/lib/emby/metadata" }
+        - { path: "/var/lib/emby/temp" }
+        - { path: "/mnt/data/emby/backup" }
