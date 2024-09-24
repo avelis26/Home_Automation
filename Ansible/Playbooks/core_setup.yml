@@ -2,8 +2,8 @@
 - hosts: localhost
   become: yes
   vars_files:
-    - secrets.yaml
-    - ssh_keys.yaml
+    - secrets.yml
+    - ssh_keys.yml
   tasks:
     # Base package installation
     - name: Install base packages
@@ -32,7 +32,7 @@
       file:
         path: /home/avelis/.ssh
         state: directory
-        mode: '0700'
+        mode: "0700"
         owner: avelis
         group: avelis
 
@@ -43,7 +43,7 @@
         create: yes
         owner: avelis
         group: avelis
-        mode: '0600'
+        mode: "0600"
       loop: "{{ ssh_keys }}"
 
     # Bashrc customization
@@ -64,7 +64,7 @@
         name: samba
         state: present
         password: "{{ samba_password }}"
-        
+
     - name: Configure Samba shares
       blockinfile:
         path: /etc/samba/smb.conf
@@ -80,7 +80,7 @@
         state: directory
         owner: avelis
         group: samba
-        mode: '0777'
+        mode: "0777"
 
     # Fstab configuration
     - name: Ensure fstab entry for /mnt/data
@@ -92,10 +92,17 @@
         state: mounted
 
     # Transmission config
+    - name: Check if Transmission is installed
+      package:
+        name: transmission-daemon
+        state: present
+      register: transmission_installed
+
     - name: Stop Transmission Daemon
       systemd:
         name: transmission-daemon
         state: stopped
+      when: transmission_installed.changed
 
     - name: Update Transmission settings
       copy:
@@ -103,8 +110,9 @@
         dest: /etc/transmission-daemon/settings.json
         owner: debian-transmission
         group: debian-transmission
-        mode: '0644'
+        mode: "0644"
       notify: Restart Transmission
+      when: transmission_installed.changed
 
   handlers:
     - name: Restart Transmission
