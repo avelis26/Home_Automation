@@ -92,7 +92,7 @@
     # NVIDIA
     - name: Install NVIDIA driver
       apt:
-        name: "nvidia-driver-550"
+        name: "nvidia-driver-535-server"
         state: present
         update_cache: yes
       notify: Reboot system
