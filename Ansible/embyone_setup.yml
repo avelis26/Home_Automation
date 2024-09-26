@@ -2,7 +2,6 @@
   become: yes
   vars_files:
     - secrets.yml
-    - ssh_keys.yml
   
   tasks:
     # SSH
