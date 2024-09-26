@@ -121,12 +121,12 @@
         name: samba
         state: present
 
-    - name: Check if Samba User Exists
-      command: getent passwd samba
+    - name: Check if Samba User Exists in Samba Database
+      command: pdbedit -L | grep samba
       register: samba_user_check
       ignore_errors: true
 
-    - name: Create Samba User
+    - name: Ensure Samba User Exists in System
       user:
         name: samba
         comment: Samba user
@@ -134,13 +134,9 @@
         append: yes
       when: samba_user_check.rc != 0
 
-    - name: Set Samba Password
-      expect:
-        command: smbpasswd -a samba
-        responses:
-          "New SMB password:": "{{ samba_password }}"
-          "Retype new SMB password:": "{{ samba_password }}"
-      when: samba_user_check.rc != 0
+    - name: Set Samba Password if User Exists
+      command: "echo -e '{{ samba_password }}\n{{ samba_password }}' | smbpasswd -a samba"
+      when: samba_user_check.rc == 0
 
     - name: Set Samba Directory
       file:
