@@ -126,6 +126,14 @@
         name: transmission-daemon
         enabled: yes
 
+    - name: Ensure Torrents Directory Ownership
+      file:
+        path: /mnt/data/Torrents
+        state: directory
+        owner: debian-transmission
+        group: debian-transmission
+        recurse: yes
+
     # LightDM
     - name: Configure LightDM
       blockinfile:
@@ -177,6 +185,14 @@
         - { path: "/var/lib/emby/metadata" }
         - { path: "/var/lib/emby/temp" }
         - { path: "/mnt/data/emby/backup" }
+
+    - name: Ensure Emby Directory Ownership
+      file:
+        path: /mnt/data/emby
+        state: directory
+        owner: emby
+        group: emby
+        recurse: yes
 
     # Reboot
     - name: Reboot
