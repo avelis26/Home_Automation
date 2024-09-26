@@ -51,10 +51,10 @@
 
     # Emby
     - name: Confirm Emby
-      command: dpkg -l | grep emby-server
+      shell: dpkg -l | grep emby-server
       register: emby_installed
-      changed_when: false
-      failed_when: emby_installed.rc != 0
+      ignore_errors: yes  # Ignore errors to continue playbook execution
+      changed_when: false  # Mark as not changed
 
     - name: Download Emby
       get_url:
