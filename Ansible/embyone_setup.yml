@@ -240,7 +240,7 @@
         content: |
           [Desktop Entry]
           Type=Application
-          Exec=cool-retro-term --fullscreen --profile /home/avelis/.config/cool-retro-term/matrix.json
+          Exec=bash -c 'cool-retro-term --program btop --profile /home/avelis/gpdos.json --fullscreen'
           Hidden=false
           NoDisplay=false
           X-GNOME-Autostart-enabled=true
