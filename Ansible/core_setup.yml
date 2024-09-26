@@ -30,6 +30,9 @@
           - traceroute
           - gcc
           - make
+          - mate-desktop-environment
+          - cool-retro-term
+          - cool-retro-term-dependencies
         state: present
         update_cache: yes
 
@@ -117,6 +120,41 @@
         name: transmission-daemon
         enabled: yes
 
+    # Set up MATE to log in automatically
+    - name: Configure LightDM for auto-login
+      lineinfile:
+        path: /etc/lightdm/lightdm.conf
+        line: "autologin-user=avelis"
+        create: yes
+
+    # Create a script to launch cool-retro-term in full-screen
+    - name: Create cool-retro-term launcher script
+      copy:
+        dest: /home/avelis/start_cool_retro_term.sh
+        content: |
+          #!/bin/bash
+          cool-retro-term --fullscreen
+        mode: '0755'
+        owner: avelis
+        group: avelis
+
+    # Autostart cool-retro-term
+    - name: Create autostart entry for cool-retro-term
+      copy:
+        dest: /home/avelis/.config/autostart/cool-retro-term.desktop
+        content: |
+          [Desktop Entry]
+          Type=Application
+          Exec=/home/avelis/start_cool_retro_term.sh
+          Hidden=false
+          NoDisplay=false
+          X-GNOME-Autostart-enabled=true
+          Name=Cool Retro Term
+          Comment=Launch Cool Retro Term on startup
+        mode: '0644'
+        owner: avelis
+        group: avelis
+
     # NVIDIA
     - name: Install NVIDIA Driver
       apt:
@@ -130,3 +168,4 @@
       reboot:
         msg: "Rebooting system to apply upgrades..."
       when: apt_update_upgrade.changed
+
