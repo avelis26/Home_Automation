@@ -2,11 +2,10 @@
   become: yes
   vars_files:
     - secrets.yml
-    - ssh_keys.yml
   
   tasks:
     # SSH
-    - name: Create .ssh Directory
+    - name: Create SSH Directory
       file:
         path: /home/avelis/.ssh
         state: directory
@@ -77,6 +76,7 @@
         name: "nvidia-driver-535-server"
         state: present
         update_cache: yes
+      register: nvidia_install
 
     # Emby
     - name: Confirm Emby
@@ -96,10 +96,11 @@
         deb: /tmp/emby-server-deb_4.8.9.0_amd64.deb
       when: emby_installed.rc != 0
 
-    # Reboot
-    - name: Reboot
+    # Reboot if necessary
+    - name: Reboot Conditionally
       reboot:
         msg: "Rebooting system..."
+      when: apt_update_upgrade.changed or nvidia_install.changed or emby_installed.rc != 0
 
     # Bashrc
     - name: Update BASHRC
@@ -116,27 +117,27 @@
         - 'export PATH="$PATH:/home/avelis/.local/bin"'
 
     # Samba
-    - name: Create Samba Group
-      group:
-        name: samba
-        state: present
-
-    - name: Check if Samba User Exists
-      command: getent passwd samba
-      register: samba_user_check
-      ignore_errors: true
-
     - name: Create Samba User
       user:
-        name: samba
-        comment: Samba user
-        groups: samba
-        append: yes
-      when: samba_user_check.rc != 0
+        name: "{{ item.username }}"
+        state: present
+      with_items:
+        - "{{ samba_users }}"
 
-    - name: Create Samba Password # TEST FROM HERE
-      command: "echo -e '{{ samba_password }}\n{{ samba_password }}' | smbpasswd -a samba"
-      when: samba_user_check.rc != 0
+    - name: Set Samba Password
+      shell: "printf '{{ item.password }}\n{{ item.password }}\n' | smbpasswd -a {{ item.username }}"
+      with_items:
+        - "{{ samba_users }}"
+      tags: smbpasswd
+      no_log: false
+
+    - name: Set Samba Directory
+      file:
+        path: /mnt/data
+        state: directory
+        owner: samba
+        group: samba
+        mode: "0777"
 
     - name: Configure Samba Share
       blockinfile:
@@ -144,16 +145,11 @@
         block: |
           [data]
             path = /mnt/data
+            valid users = {{ samba_users | map(attribute='username') | join(',') }}
             read only = no
-            valid users = samba
-
-    - name: Set Samba Directory
-      file:
-        path: /mnt/data
-        state: directory
-        owner: avelis
-        group: samba
-        mode: "0777"
+            browsable = yes
+            create mask = 0777
+            directory mask = 0777
 
     # Fstab
     - name: Edit FSTAB
@@ -170,7 +166,7 @@
         name: transmission-daemon
         state: stopped
 
-    - name: Update Transmission Settings
+    - name: Update Transmission Settings #test here - all above success
       template:
         src: transmission_settings.json
         dest: /etc/transmission-daemon/settings.json
