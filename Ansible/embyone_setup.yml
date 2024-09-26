@@ -179,6 +179,13 @@
         name: transmission-daemon
         enabled: yes
 
+    - name: Change Transmission Type
+      lineinfile:
+        path: /lib/systemd/system/transmission-daemon.service
+        regexp: '^Type=notify'
+        line: 'Type=simple'
+        state: present
+
     # LightDM
     - name: Update LightDM Config
       copy:
