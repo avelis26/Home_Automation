@@ -105,7 +105,7 @@
         name: "nvidia-driver-535-server"
         state: present
         update_cache: yes
-      notify: Reboot system
+      notify: Reboot System
   handlers:
     - name: Reboot System
       reboot:
