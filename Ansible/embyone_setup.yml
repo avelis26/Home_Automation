@@ -20,14 +20,12 @@
         key: "{{ item }}"
       loop: "{{ ssh_keys }}"
 
-    - name: Add Pi-Star SSH Key # FAIL
-      copy:
-        src: /home/pi-star/.ssh/id_rsa.pub
-        dest: /home/avelis/.ssh/authorized_keys
-        owner: avelis
-        group: avelis
-        mode: '0600'
-      delegate_to: pi-star
+    - name: Add Pi-Star SSH Key
+      authorized_key:
+        user: avelis
+        state: present
+        key: "{{ lookup('file', '/home/pi-star/.ssh/id_rsa.pub') }}"
+      delegate_to: embyone
 
     - name: Add User To Sudoers
       lineinfile:
