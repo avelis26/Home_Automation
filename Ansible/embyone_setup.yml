@@ -117,10 +117,17 @@
         - 'export PATH="$PATH:/home/avelis/.local/bin"'
 
     # Samba
+    - name: Create Samba User
+      user:
+        name: "{{ item.username }}"
+        state: present
+      with_items:
+        - "{{ samba_users }}"
+
     - name: Set Samba Password
       shell: "printf '{{ item.password }}\n{{ item.password }}\n' | smbpasswd -a {{ item.username }}"
       with_items:
-          - "{{ samba_users }}"
+        - "{{ samba_users }}"
       tags: smbpasswd
       no_log: false
 
