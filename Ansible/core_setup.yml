@@ -137,6 +137,15 @@
         owner: avelis
         group: avelis
 
+    # Ensure autostart directory exists
+    - name: Create autostart directory
+      file:
+        path: /home/avelis/.config/autostart
+        state: directory
+        owner: avelis
+        group: avelis
+        mode: '0755'
+
     # Autostart cool-retro-term
     - name: Create autostart entry for cool-retro-term
       copy:
@@ -167,4 +176,3 @@
       reboot:
         msg: "Rebooting system to apply upgrades..."
       when: apt_update_upgrade.changed
-
