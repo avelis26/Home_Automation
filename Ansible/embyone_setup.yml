@@ -5,7 +5,7 @@
   
   tasks:
     # SSH
-    - name: Create .ssh Directory
+    - name: Create SSH Directory
       file:
         path: /home/avelis/.ssh
         state: directory
@@ -97,7 +97,7 @@
       when: emby_installed.rc != 0
 
     # Reboot if necessary
-    - name: Reboot if APT upgraded or NVIDIA installed or Emby installed
+    - name: Reboot Conditionally
       reboot:
         msg: "Rebooting system..."
       when: apt_update_upgrade.changed or nvidia_install.changed or emby_installed.rc != 0
@@ -117,30 +117,11 @@
         - 'export PATH="$PATH:/home/avelis/.local/bin"'
 
     # Samba
-    - name: shell - create samba users
-      ansible.builtin.shell: >
-        set -e -o pipefail
-        && (pdbedit --user={{ item.username }} 2>&1 > /dev/null)
-        || (echo '{{ item.password }}'; echo '{{ item.password }}')
-        | smbpasswd -s -a {{ item.username }}
-      args:
-        executable: /bin/bash
-      register: samba_create_users
-      changed_when: "'Added user' in samba_create_users.stdout"
-      loop: "{{ samba_users }}"
-      no_log: true
-
-    - name: shell - set samba passwords correctly
-      ansible.builtin.shell: >
-        set -e -o pipefail
-        && (smbclient -U {{ item.username }}%{{ item.password }} -L 127.0.0.1 2>&1 > /dev/null)
-        || (echo '{{ item.password }}'; echo '{{ item.password }}')
-        | smbpasswd {{ item.username }}
-      args:
-        executable: /bin/bash
-      register: samba_verify_users
-      changed_when: "'New SMB password' in samba_verify_users.stdout"
-      loop: "{{ samba_users }}"
+    - name: Set Samba Password
+      shell: "printf '{{ item.password }}\n{{ item.password }}\n' | smbpasswd -a {{ item.username }}"
+      with_items:
+          - "{{ samba_users }}"
+      tags: smbpasswd
       no_log: true
 
     - name: Set Samba Directory
