@@ -8,7 +8,7 @@
     - name: Update and Upgrade APT Packages
       apt:
         update_cache: yes
-        upgrade: dist
+        upgrade: dist  # Use 'dist' for a full upgrade
       register: apt_update_upgrade
 
     # Packages
@@ -126,6 +126,15 @@
         path: /etc/lightdm/lightdm.conf
         line: "autologin-user=avelis"
         create: yes
+
+    # Ensure LightDM is enabled and set default target to graphical
+    - name: Enable LightDM
+      systemd:
+        name: lightdm
+        enabled: yes
+
+    - name: Set default target to graphical
+      command: systemctl set-default graphical.target
 
     # Create a script to launch cool-retro-term in full-screen
     - name: Create cool-retro-term launcher script
