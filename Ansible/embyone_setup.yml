@@ -135,7 +135,7 @@
       file:
         path: /mnt/data
         state: directory
-        owner: avelis
+        owner: samba
         group: samba
         mode: "0777"
 
