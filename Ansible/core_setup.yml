@@ -4,8 +4,6 @@
     - secrets.yml
     - ssh_keys.yml
   tasks:
-    # INSTALLATION TASKS
-
     # APT
     - name: Update & Upgrade APT
       apt:
@@ -61,13 +59,10 @@
       apt:
         deb: /tmp/emby-server-deb_4.8.9.0_amd64.deb
 
-    # Reboot after installation tasks
+    # Reboot
     - name: Reboot
       reboot:
-        msg: "Rebooting system to apply upgrades..."
-      when: apt_update_upgrade.changed
-
-    # CONFIGURATION TASKS (after reboot)
+        msg: "Rebooting system..."
 
     # VISUDO
     - name: Update VISUDO
@@ -211,3 +206,8 @@
         owner: emby
         group: emby
         recurse: yes
+
+    # Reboot
+    - name: Reboot
+      reboot:
+        msg: "Rebooting system..."
