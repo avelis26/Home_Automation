@@ -118,27 +118,31 @@
         - 'export PATH="$PATH:/home/avelis/.local/bin"'
 
     # Samba
-    - name: Create Samba Group
-      group:
-        name: samba
-        state: present
+    - name: shell - create samba users
+      ansible.builtin.shell: >
+        set -e -o pipefail
+        && (pdbedit --user={{ item.username }} 2>&1 > /dev/null)
+        || (echo '{{ item.password }}'; echo '{{ item.password }}')
+        | smbpasswd -s -a {{ item.username }}
+      args:
+        executable: /bin/bash
+      register: samba_create_users
+      changed_when: "'Added user' in samba_create_users.stdout"
+      loop: "{{ samba_users }}"
+      no_log: true
 
-    - name: Check if Samba User Exists in Samba Database
-      command: pdbedit -L | grep samba
-      register: samba_user_check
-      ignore_errors: true
-
-    - name: Ensure Samba User Exists in System
-      user:
-        name: samba
-        comment: Samba user
-        groups: samba
-        append: yes
-      when: samba_user_check.rc != 0
-
-    - name: Set Samba Password if User Exists
-      command: "echo -e '{{ samba_password }}\n{{ samba_password }}' | smbpasswd -a samba"
-      when: samba_user_check.rc == 0
+    - name: shell - set samba passwords correctly
+      ansible.builtin.shell: >
+        set -e -o pipefail
+        && (smbclient -U {{ item.username }}%{{ item.password }} -L 127.0.0.1 2>&1 > /dev/null)
+        || (echo '{{ item.password }}'; echo '{{ item.password }}')
+        | smbpasswd {{ item.username }}
+      args:
+        executable: /bin/bash
+      register: samba_verify_users
+      changed_when: "'New SMB password' in samba_verify_users.stdout"
+      loop: "{{ samba_users }}"
+      no_log: true
 
     - name: Set Samba Directory
       file:
