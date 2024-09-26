@@ -32,7 +32,6 @@
           - make
           - mate-desktop-environment
           - cool-retro-term
-          - cool-retro-term-dependencies
         state: present
         update_cache: yes
 
