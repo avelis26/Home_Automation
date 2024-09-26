@@ -4,7 +4,7 @@
     - secrets.yml
     - ssh_keys.yml
   tasks:
-    # Update and Upgrade Packages
+    # Update and Upgrade APT Packages
     - name: Update and Upgrade APT Packages
       apt:
         update_cache: yes
@@ -111,7 +111,6 @@
         owner: debian-transmission
         group: debian-transmission
         mode: "0644"
-      notify: Restart Transmission
 
     - name: Enable Transmission Daemon
       systemd:
@@ -126,16 +125,17 @@
         update_cache: yes
       notify: Reboot System
 
-  handlers:
-    - name: Reboot System
+    # Reboot if packages were upgraded
+    - name: Reboot if packages were upgraded
+      reboot:
+        msg: "Rebooting system to apply upgrades..."
+      when: apt_update_upgrade.changed
+
+    # Final Reboot
+    - name: Final Reboot
       reboot:
         msg: "Rebooting system to load NVIDIA driver..."
         connect_timeout: 5
         reboot_timeout: 300
         pre_reboot_delay: 5
         post_reboot_delay: 10
-
-    - name: Restart Transmission
-      systemd:
-        name: transmission-daemon
-        state: restarted
