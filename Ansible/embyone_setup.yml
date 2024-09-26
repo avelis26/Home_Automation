@@ -102,7 +102,7 @@
         msg: "Rebooting system..."
 
     # Bashrc
-    - name: Update BASHRC # TEST FROM HERE
+    - name: Update BASHRC
       lineinfile:
         path: /home/avelis/.bashrc
         line: "{{ item }}"
@@ -121,26 +121,31 @@
         name: samba
         state: present
 
+    - name: Check if Samba User Exists
+      command: getent passwd samba
+      register: samba_user_check
+      ignore_errors: true
+
     - name: Create Samba User
       user:
         name: samba
         comment: Samba user
         groups: samba
         append: yes
+      when: samba_user_check.rc != 0
 
-    - name: Create Samba Password
+    - name: Create Samba Password # TEST FROM HERE
       command: "echo -e '{{ samba_password }}\n{{ samba_password }}' | smbpasswd -a samba"
-      args:
-        creates: /var/lib/samba/private/passdb.tdb
+      when: samba_user_check.rc != 0
 
     - name: Configure Samba Share
       blockinfile:
         path: /etc/samba/smb.conf
         block: |
           [data]
-             path = /mnt/data
-             read only = no
-             valid users = samba
+            path = /mnt/data
+            read only = no
+            valid users = samba
 
     - name: Set Samba Directory
       file:
