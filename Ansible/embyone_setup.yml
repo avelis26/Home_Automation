@@ -239,7 +239,7 @@
         content: |
           [Desktop Entry]
           Type=Application
-          Exec=cool-retro-term --fullscreen
+          Exec=cool-retro-term --fullscreen --profile /home/avelis/.config/cool-retro-term/matrix.json
           Hidden=false
           NoDisplay=false
           X-GNOME-Autostart-enabled=true
