@@ -45,6 +45,10 @@
         - 'alias nvtop="gpustat -a -i 1"'
         - 'export PATH="$PATH:/home/avelis/.local/bin"'
     # Samba
+    - name: Create Samba Group
+      group:
+        name: samba
+        state: present
     - name: Create Samba User
       user:
         name: samba
