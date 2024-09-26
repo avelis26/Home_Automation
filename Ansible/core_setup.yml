@@ -165,13 +165,14 @@
         recurse: yes
 
     # LightDM
-    - name: Configure LightDM
-      blockinfile:
-        path: /etc/lightdm/lightdm.conf
-        block: |
+    - name: Ensure LightDM Configuration File Exists
+      copy:
+        dest: /etc/lightdm/lightdm.conf
+        content: |
           [Seat:*]
           autologin-user=avelis
           autologin-user-timeout=0
+        mode: '0644'
 
     - name: Enable LightDM
       systemd:
