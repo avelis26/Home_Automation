@@ -6,6 +6,14 @@
   
   tasks:
     # SSH
+    - name: Create .ssh Directory
+      file:
+        path: /home/avelis/.ssh
+        state: directory
+        owner: avelis
+        group: avelis
+        mode: '0700'
+
     - name: Add Gaming-PC SSH Key
       authorized_key:
         user: avelis
