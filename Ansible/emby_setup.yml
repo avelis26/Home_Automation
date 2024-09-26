@@ -4,12 +4,12 @@
   tasks:
     - name: Download Emby
       get_url:
-        url: https://github.com/MediaBrowser/Emby.Releases/releases/download/4.8.8.0/emby-server-deb_4.8.8.0_amd64.deb
-        dest: /tmp/emby-server-deb_4.8.8.0_amd64.deb
+        url: https://github.com/MediaBrowser/Emby.Releases/releases/download/4.8.9.0/emby-server-deb_4.8.9.0_amd64.deb
+        dest: /tmp/emby-server-deb_4.8.9.0_amd64.deb
 
     - name: Install Emby
       apt:
-        deb: /tmp/emby-server-deb_4.8.8.0_amd64.deb
+        deb: /tmp/emby-server-deb_4.8.9.0_amd64.deb
 
     - name: Setup Emby directories
       file:

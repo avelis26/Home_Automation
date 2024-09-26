@@ -127,7 +127,7 @@
         enabled: yes
 
     # LightDM
-    - name: Configure LightDM for auto-login
+    - name: Configure LightDM
       blockinfile:
         path: /etc/lightdm/lightdm.conf
         block: |
@@ -145,7 +145,7 @@
         name: lightdm
         state: started
 
-    - name: Set default target to graphical
+    - name: Set Default GUI
       command: systemctl set-default graphical.target
 
     # NVIDIA
@@ -156,8 +156,30 @@
         update_cache: yes
       notify: Reboot System
 
+    # Emby
+    - name: Download Emby
+      get_url:
+        url: https://github.com/MediaBrowser/Emby.Releases/releases/download/4.8.9.0/emby-server-deb_4.8.9.0_amd64.deb
+        dest: /tmp/emby-server-deb_4.8.9.0_amd64.deb
+
+    - name: Install Emby
+      apt:
+        deb: /tmp/emby-server-deb_4.8.9.0_amd64.deb
+
+    - name: Set Emby Directories
+      file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: emby
+        group: emby
+        mode: '0755'
+      loop:
+        - { path: "/var/lib/emby/metadata" }
+        - { path: "/var/lib/emby/temp" }
+        - { path: "/mnt/data/emby/backup" }
+
     # Reboot
-    - name: Reboot if packages were upgraded
+    - name: Reboot
       reboot:
         msg: "Rebooting system to apply upgrades..."
       when: apt_update_upgrade.changed
