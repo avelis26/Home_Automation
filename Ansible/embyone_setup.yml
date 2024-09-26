@@ -139,7 +139,7 @@
         group: samba
         mode: "0777"
 
-    - name: Configure Samba Share #test here - all above success
+    - name: Configure Samba Share
       blockinfile:
         path: /etc/samba/smb.conf
         block: |
@@ -166,7 +166,7 @@
         name: transmission-daemon
         state: stopped
 
-    - name: Update Transmission Settings
+    - name: Update Transmission Settings #test here - all above success
       template:
         src: transmission_settings.json
         dest: /etc/transmission-daemon/settings.json
