@@ -4,9 +4,6 @@
     - secrets.yml
     - ssh_keys.yml
   
-  vars:
-    reboot_needed: false  # Initialize variable to track if a reboot is needed
-
   tasks:
     # SSH
     - name: Create .ssh Directory
@@ -42,12 +39,6 @@
         update_cache: yes
         upgrade: dist
       register: apt_update_upgrade
-      when: apt_update_upgrade is not skipped  # Ensure the task is not skipped
-
-    - name: Set reboot_needed to true if packages upgraded
-      set_fact:
-        reboot_needed: true
-      when: apt_update_upgrade.changed
 
     # Packages
     - name: Install Base Packages
@@ -87,12 +78,6 @@
         state: present
         update_cache: yes
       register: nvidia_install
-      when: nvidia_install is not skipped
-
-    - name: Set reboot_needed to true if NVIDIA driver installed
-      set_fact:
-        reboot_needed: true
-      when: nvidia_install.changed
 
     # Emby
     - name: Confirm Emby
@@ -112,16 +97,11 @@
         deb: /tmp/emby-server-deb_4.8.9.0_amd64.deb
       when: emby_installed.rc != 0
 
-    - name: Set reboot_needed to true if Emby was installed
-      set_fact:
-        reboot_needed: true
-      when: emby_installed.rc != 0
-
-    # Reboot
-    - name: Reboot
+    # Reboot if necessary
+    - name: Reboot if APT upgraded or NVIDIA installed or Emby installed
       reboot:
         msg: "Rebooting system..."
-      when: reboot_needed  # Only reboot if reboot_needed is true
+      when: apt_update_upgrade.changed or nvidia_install.changed or emby_installed.rc != 0
 
     # Bashrc
     - name: Update BASHRC
