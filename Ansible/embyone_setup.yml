@@ -232,8 +232,8 @@
         content: |
           # Launch cool-retro-term 5 seconds after login
           (sleep 5 && cool-retro-term --fullscreen --profile /home/pi-star/source/Home_Automation/Ansible/matrix.json) &
-      owner: avelis
-      mode: '0644'
+        owner: avelis
+        mode: '0644'
 
     # Reboot
     - name: Reboot
