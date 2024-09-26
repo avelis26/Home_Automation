@@ -20,7 +20,7 @@
         key: "{{ item }}"
       loop: "{{ ssh_keys }}"
 
-    - name: Add Pi-Star SSH Key
+    - name: Add Pi-Star SSH Key # FAIL
       copy:
         src: /home/pi-star/.ssh/id_rsa.pub
         dest: /home/avelis/.ssh/authorized_keys
@@ -104,7 +104,7 @@
         msg: "Rebooting system..."
 
     # Bashrc
-    - name: Update BASHRC
+    - name: Update BASHRC # TEST FROM HERE
       lineinfile:
         path: /home/avelis/.bashrc
         line: "{{ item }}"
@@ -203,6 +203,22 @@
     - name: Set Default GUI
       command: systemctl set-default graphical.target
 
+    - name: Cool-Retro-Term Autostart
+      copy:
+        dest: /home/avelis/.config/autostart/cool-retro-term.desktop
+        content: |
+          [Desktop Entry]
+          Type=Application
+          Exec=cool-retro-term --fullscreen
+          Hidden=false
+          NoDisplay=false
+          X-GNOME-Autostart-enabled=true
+          Name=Cool Retro Term
+          Comment=Launch cool-retro-term on desktop login
+        owner: avelis
+        group: avelis
+        mode: '0644'
+
     # Directories
     - name: Set Emby Directories
       file:
@@ -224,15 +240,6 @@
         owner: debian-transmission
         group: debian-transmission
         recurse: yes
-
-    - name: Create Terminal Autostart
-      ansible.builtin.copy:
-        dest: /home/avelis/.bashrc
-        content: |
-          # Launch cool-retro-term 5 seconds after login
-          (sleep 5 && cool-retro-term --fullscreen --profile /home/pi-star/source/Home_Automation/Ansible/matrix.json) &
-        owner: avelis
-        mode: '0644'
 
     # Reboot
     - name: Reboot
