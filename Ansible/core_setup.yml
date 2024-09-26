@@ -53,8 +53,8 @@
     - name: Confirm Emby
       shell: dpkg -l | grep emby-server
       register: emby_installed
-      ignore_errors: yes  # Ignore errors to continue playbook execution
-      changed_when: false  # Mark as not changed
+      ignore_errors: yes
+      changed_when: false
 
     - name: Download Emby
       get_url:
