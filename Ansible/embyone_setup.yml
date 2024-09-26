@@ -201,7 +201,7 @@
     - name: Set Default GUI
       command: systemctl set-default graphical.target
 
-    - name: Ensure Cool Retro Term Config Directory Exists
+    - name: Create Term Config Directory
       file:
         path: /home/avelis/.config/cool-retro-term
         state: directory
@@ -209,7 +209,7 @@
         group: avelis
         mode: '0755'
 
-    - name: Copy matrix.json to Cool Retro Term Config Directory
+    - name: Copy Term Profile
       copy:
         src: matrix.json
         dest: /home/avelis/.config/cool-retro-term/matrix.json
@@ -225,7 +225,7 @@
         group: avelis
         mode: '0755'
 
-    - name: Cool-Retro-Term Autostart
+    - name: Create Term Autostart
       copy:
         dest: /home/avelis/.config/autostart/cool-retro-term.desktop
         content: |
