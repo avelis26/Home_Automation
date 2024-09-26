@@ -4,6 +4,13 @@
     - secrets.yml
     - ssh_keys.yml
   tasks:
+    # Update and Upgrade Packages
+    - name: Update and Upgrade APT Packages
+      apt:
+        update_cache: yes
+        upgrade: dist  # Use 'dist' for a full upgrade
+      register: apt_update_upgrade
+
     # Packages
     - name: Install Base Packages
       apt:
@@ -25,12 +32,14 @@
           - make
         state: present
         update_cache: yes
+
     # SSH
     - name: Add SSH Keys
       authorized_key:
         user: avelis
         key: "{{ item }}"
       loop: "{{ ssh_keys }}"
+
     # Bashrc
     - name: Update BASHRC
       lineinfile:
@@ -44,21 +53,25 @@
         - 'alias update="sudo apt update -y && sudo apt full-upgrade -y && sudo apt autoremove -y"'
         - 'alias nvtop="gpustat -a -i 1"'
         - 'export PATH="$PATH:/home/avelis/.local/bin"'
+
     # Samba
     - name: Create Samba Group
       group:
         name: samba
         state: present
+
     - name: Create Samba User
       user:
         name: samba
         comment: Samba user
         groups: samba
         append: yes
+
     - name: Create Samba Password
       command: "echo -e '{{ samba_password }}\n{{ samba_password }}' | smbpasswd -a samba"
       args:
         creates: /var/lib/samba/private/passdb.tdb
+
     - name: Configure Samba Share
       blockinfile:
         path: /etc/samba/smb.conf
@@ -67,6 +80,7 @@
              path = /mnt/data
              read only = no
              valid users = samba
+
     - name: Set Samba Directory
       file:
         path: /mnt/data
@@ -74,6 +88,7 @@
         owner: avelis
         group: samba
         mode: "0777"
+
     # Fstab
     - name: Edit FSTAB
       mount:
@@ -82,11 +97,13 @@
         fstype: ext4
         opts: defaults
         state: mounted
+
     # Transmission
     - name: Stop Transmission Daemon
       systemd:
         name: transmission-daemon
         state: stopped
+
     - name: Set Transmission Settings
       template:
         src: transmission_settings.json
@@ -95,10 +112,12 @@
         group: debian-transmission
         mode: "0644"
       notify: Restart Transmission
+
     - name: Enable Transmission Daemon
       systemd:
         name: transmission-daemon
         enabled: yes
+
     # NVIDIA
     - name: Install NVIDIA Driver
       apt:
@@ -106,6 +125,7 @@
         state: present
         update_cache: yes
       notify: Reboot System
+
   handlers:
     - name: Reboot System
       reboot:
@@ -114,6 +134,7 @@
         reboot_timeout: 300
         pre_reboot_delay: 5
         post_reboot_delay: 10
+
     - name: Restart Transmission
       systemd:
         name: transmission-daemon
