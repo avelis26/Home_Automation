@@ -123,13 +123,14 @@
         state: present
       with_items:
         - "{{ samba_users }}"
+      no_log: true
 
     - name: Set Samba Password
       shell: "printf '{{ item.password }}\n{{ item.password }}\n' | smbpasswd -a {{ item.username }}"
       with_items:
         - "{{ samba_users }}"
       tags: smbpasswd
-      no_log: false
+      no_log: true
 
     - name: Set Samba Directory
       file:
@@ -239,7 +240,7 @@
         content: |
           [Desktop Entry]
           Type=Application
-          Exec=cool-retro-term --fullscreen
+          Exec=bash -c 'cool-retro-term --profile /home/avelis/.config/cool-retro-term/matrix.json --fullscreen -e btop'
           Hidden=false
           NoDisplay=false
           X-GNOME-Autostart-enabled=true
