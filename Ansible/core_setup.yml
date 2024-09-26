@@ -4,6 +4,14 @@
     - secrets.yml
     - ssh_keys.yml
   tasks:
+    # VISUDO
+    - name: Update VISUDO
+      lineinfile:
+      path: /etc/sudoers.d/avelis
+      line: "avelis ALL=(ALL) NOPASSWD: ALL"
+      create: yes
+      mode: '0440'
+
     # APT
     - name: Update and Upgrade APT Packages
       apt:
