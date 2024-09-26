@@ -53,7 +53,8 @@
     - name: Confirm Emby
       command: dpkg -l | grep emby-server
       register: emby_installed
-      ignore_errors: yes
+      changed_when: false
+      failed_when: emby_installed.rc != 0
 
     - name: Download Emby
       get_url:
@@ -187,10 +188,11 @@
       command: systemctl set-default graphical.target
 
     # System
-    - name: Disable Screen Blanking
-      command: >
-        dconf write /org/mate/desktop/session/idle-delay 0 &&
-        dconf write /org/mate/settings-daemon/plugins/power/sleep-inactive-ac-timeout 0
+    - name: Disable Screen Blanking Idle
+      command: dconf write /org/mate/desktop/session/idle-delay 0
+
+    - name: Disable Screen Blanking Sleep
+      command: dconf write /org/mate/settings-daemon/plugins/power/sleep-inactive-ac-timeout 0
 
     # Directories
     - name: Set Emby Directories
