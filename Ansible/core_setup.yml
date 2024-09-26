@@ -51,7 +51,6 @@
         comment: Samba user
         groups: samba
         append: yes
-        password: "{{ samba_password | password_hash('sha512') }}"
     - name: Create Samba Password
       command: "echo -e '{{ samba_password }}\n{{ samba_password }}' | smbpasswd -a samba"
       args:
