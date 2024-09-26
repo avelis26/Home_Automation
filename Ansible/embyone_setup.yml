@@ -122,7 +122,7 @@
       with_items:
           - "{{ samba_users }}"
       tags: smbpasswd
-      no_log: true
+      no_log: false
 
     - name: Set Samba Directory
       file:
