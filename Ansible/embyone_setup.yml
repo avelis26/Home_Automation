@@ -28,7 +28,6 @@
         group: avelis
         mode: '0600'
       delegate_to: pi-star
-      when: ansible_file_src is defined and ansible_file_src != ''
 
     - name: Add User To Sudoers
       lineinfile:
