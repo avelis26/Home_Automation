@@ -4,6 +4,28 @@
     - secrets.yml
     - ssh_keys.yml
   tasks:
+    # SSH
+    - name: Add Gaming-PC SSH Key
+      authorized_key:
+        user: avelis
+        key: "{{ item }}"
+      loop: "{{ ssh_keys }}"
+
+    - name: Add Pi-Star SSH Key
+      copy:
+        src: /home/pi-star/.ssh/id_rsa.pub
+        dest: /home/avelis/.ssh/authorized_keys
+        owner: avelis
+        group: avelis
+        mode: '0600'
+      delegate_to: pi-star
+
+    - name: Add User To Sudoers
+      lineinfile:
+        path: /etc/sudoers
+        line: 'avelis ALL=(ALL:ALL) NOPASSWD:ALL'
+        validate: 'visudo -cf %s'
+    
     # APT
     - name: Update & Upgrade APT
       apt:
@@ -71,21 +93,6 @@
     - name: Reboot
       reboot:
         msg: "Rebooting system..."
-
-    # VISUDO
-    - name: Update VISUDO
-      lineinfile:
-        path: /etc/sudoers.d/avelis
-        line: "avelis ALL=(ALL) NOPASSWD: ALL"
-        create: yes
-        mode: '0440'
-
-    # SSH
-    - name: Add SSH Keys
-      authorized_key:
-        user: avelis
-        key: "{{ item }}"
-      loop: "{{ ssh_keys }}"
 
     # Bashrc
     - name: Update BASHRC
