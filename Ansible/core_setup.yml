@@ -130,12 +130,3 @@
       reboot:
         msg: "Rebooting system to apply upgrades..."
       when: apt_update_upgrade.changed
-
-    # Final Reboot
-    - name: Final Reboot
-      reboot:
-        msg: "Rebooting system to load NVIDIA driver..."
-        connect_timeout: 5
-        reboot_timeout: 300
-        pre_reboot_delay: 5
-        post_reboot_delay: 10
