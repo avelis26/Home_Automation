@@ -217,6 +217,14 @@
         group: avelis
         mode: '0644'
 
+    - name: Create Autostart Directory
+      file:
+        path: /home/avelis/.config/autostart
+        state: directory
+        owner: avelis
+        group: avelis
+        mode: '0755'
+
     - name: Cool-Retro-Term Autostart
       copy:
         dest: /home/avelis/.config/autostart/cool-retro-term.desktop
