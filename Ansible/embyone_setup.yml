@@ -240,7 +240,7 @@
         content: |
           [Desktop Entry]
           Type=Application
-          Exec=bash -c 'cool-retro-term --program btop --profile /home/avelis/gpdos.json --fullscreen'
+          Exec=bash -c 'cool-retro-term --profile /home/avelis/gpdos.json --fullscreen -e btop'
           Hidden=false
           NoDisplay=false
           X-GNOME-Autostart-enabled=true
