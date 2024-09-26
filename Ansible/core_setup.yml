@@ -50,14 +50,21 @@
         update_cache: yes
 
     # Emby
+    - name: Confirm Emby
+      command: dpkg -l | grep emby-server
+      register: emby_installed
+      ignore_errors: yes
+
     - name: Download Emby
       get_url:
         url: https://github.com/MediaBrowser/Emby.Releases/releases/download/4.8.9.0/emby-server-deb_4.8.9.0_amd64.deb
         dest: /tmp/emby-server-deb_4.8.9.0_amd64.deb
+      when: emby_installed.rc != 0
 
     - name: Install Emby
       apt:
         deb: /tmp/emby-server-deb_4.8.9.0_amd64.deb
+      when: emby_installed.rc != 0
 
     # Reboot
     - name: Reboot
@@ -143,7 +150,7 @@
         name: transmission-daemon
         state: stopped
 
-    - name: Set Transmission Settings
+    - name: Update Transmission Settings
       template:
         src: transmission_settings.json
         dest: /etc/transmission-daemon/settings.json
@@ -156,16 +163,8 @@
         name: transmission-daemon
         enabled: yes
 
-    - name: Ensure Torrents Directory Ownership
-      file:
-        path: /mnt/data/Torrents
-        state: directory
-        owner: debian-transmission
-        group: debian-transmission
-        recurse: yes
-
     # LightDM
-    - name: Ensure LightDM Configuration File Exists
+    - name: Update LightDM Config
       copy:
         dest: /etc/lightdm/lightdm.conf
         content: |
@@ -187,7 +186,13 @@
     - name: Set Default GUI
       command: systemctl set-default graphical.target
 
-    # Emby Directories
+    # System
+    - name: Disable Screen Blanking
+      command: >
+        dconf write /org/mate/desktop/session/idle-delay 0 &&
+        dconf write /org/mate/settings-daemon/plugins/power/sleep-inactive-ac-timeout 0
+
+    # Directories
     - name: Set Emby Directories
       file:
         path: "{{ item.path }}"
@@ -196,16 +201,17 @@
         group: emby
         mode: '0755'
       loop:
+        - { path: "/mnt/data/emby" }
         - { path: "/var/lib/emby/metadata" }
         - { path: "/var/lib/emby/temp" }
         - { path: "/mnt/data/emby/backup" }
 
-    - name: Ensure Emby Directory Ownership
+    - name: Set Torrent Directories
       file:
-        path: /mnt/data/emby
+        path: /mnt/data/Torrents
         state: directory
-        owner: emby
-        group: emby
+        owner: debian-transmission
+        group: debian-transmission
         recurse: yes
 
     # Reboot
