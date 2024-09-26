@@ -1,4 +1,12 @@
+# /etc/ansible/inventory.yml
 all:
   hosts:
     embyone:
       ansible_host: 192.168.50.126
+      ansible_user: avelis
+      ansible_become: true
+      ansible_ssh_private_key_file: /home/pi-star/.ssh/id_rsa
+      ansible_ssh_pass: "{{ lookup('file', '/home/pi-star/source/Home_Automation/Ansible/secrets.yml') | from_yaml | json_query('ansible_ssh_pass') }}"
+
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
