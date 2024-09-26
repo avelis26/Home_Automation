@@ -187,13 +187,6 @@
     - name: Set Default GUI
       command: systemctl set-default graphical.target
 
-    # System
-    - name: Disable Screen Blanking Idle
-      command: dconf write /org/mate/desktop/session/idle-delay 0
-
-    - name: Disable Screen Blanking Sleep
-      command: dconf write /org/mate/settings-daemon/plugins/power/sleep-inactive-ac-timeout 0
-
     # Directories
     - name: Set Emby Directories
       file:
