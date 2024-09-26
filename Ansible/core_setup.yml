@@ -4,16 +4,10 @@
     - secrets.yml
     - ssh_keys.yml
   tasks:
-    # VISUDO
-    - name: Update VISUDO
-      lineinfile:
-      path: /etc/sudoers.d/avelis
-      line: "avelis ALL=(ALL) NOPASSWD: ALL"
-      create: yes
-      mode: '0440'
+    # INSTALLATION TASKS
 
     # APT
-    - name: Update and Upgrade APT Packages
+    - name: Update & Upgrade APT
       apt:
         update_cache: yes
         upgrade: dist
@@ -49,6 +43,39 @@
           - cool-retro-term
         state: present
         update_cache: yes
+
+    # NVIDIA
+    - name: Install NVIDIA Driver
+      apt:
+        name: "nvidia-driver-535-server"
+        state: present
+        update_cache: yes
+
+    # Emby
+    - name: Download Emby
+      get_url:
+        url: https://github.com/MediaBrowser/Emby.Releases/releases/download/4.8.9.0/emby-server-deb_4.8.9.0_amd64.deb
+        dest: /tmp/emby-server-deb_4.8.9.0_amd64.deb
+
+    - name: Install Emby
+      apt:
+        deb: /tmp/emby-server-deb_4.8.9.0_amd64.deb
+
+    # Reboot after installation tasks
+    - name: Reboot
+      reboot:
+        msg: "Rebooting system to apply upgrades..."
+      when: apt_update_upgrade.changed
+
+    # CONFIGURATION TASKS (after reboot)
+
+    # VISUDO
+    - name: Update VISUDO
+      lineinfile:
+        path: /etc/sudoers.d/avelis
+        line: "avelis ALL=(ALL) NOPASSWD: ALL"
+        create: yes
+        mode: '0440'
 
     # SSH
     - name: Add SSH Keys
@@ -164,24 +191,7 @@
     - name: Set Default GUI
       command: systemctl set-default graphical.target
 
-    # NVIDIA
-    - name: Install NVIDIA Driver
-      apt:
-        name: "nvidia-driver-535-server"
-        state: present
-        update_cache: yes
-      notify: Reboot System
-
-    # Emby
-    - name: Download Emby
-      get_url:
-        url: https://github.com/MediaBrowser/Emby.Releases/releases/download/4.8.9.0/emby-server-deb_4.8.9.0_amd64.deb
-        dest: /tmp/emby-server-deb_4.8.9.0_amd64.deb
-
-    - name: Install Emby
-      apt:
-        deb: /tmp/emby-server-deb_4.8.9.0_amd64.deb
-
+    # Emby Directories
     - name: Set Emby Directories
       file:
         path: "{{ item.path }}"
@@ -201,9 +211,3 @@
         owner: emby
         group: emby
         recurse: yes
-
-    # Reboot
-    - name: Reboot
-      reboot:
-        msg: "Rebooting system to apply upgrades..."
-      when: apt_update_upgrade.changed
