@@ -139,6 +139,18 @@
         group: samba
         mode: "0777"
 
+    - name: Configure Samba Share #test here - all above success
+      blockinfile:
+        path: /etc/samba/smb.conf
+        block: |
+          [data]
+            path = /mnt/data
+            valid users = {{ samba_users | map(attribute='username') | join(',') }}
+            read only = no
+            browsable = yes
+            create mask = 0777
+            directory mask = 0777
+
     # Fstab
     - name: Edit FSTAB
       mount:
