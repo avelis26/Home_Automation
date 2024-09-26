@@ -123,13 +123,14 @@
         state: present
       with_items:
         - "{{ samba_users }}"
+      no_log: true
 
     - name: Set Samba Password
       shell: "printf '{{ item.password }}\n{{ item.password }}\n' | smbpasswd -a {{ item.username }}"
       with_items:
         - "{{ samba_users }}"
       tags: smbpasswd
-      no_log: false
+      no_log: true
 
     - name: Set Samba Directory
       file:
