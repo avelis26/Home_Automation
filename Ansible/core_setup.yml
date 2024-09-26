@@ -11,7 +11,7 @@
         upgrade: dist
       register: apt_update_upgrade
 
-        # Packages
+    # Packages
     - name: Install Base Packages
       apt:
         name:
@@ -126,12 +126,14 @@
         name: transmission-daemon
         enabled: yes
 
-    # Configure LightDM
+    # LightDM
     - name: Configure LightDM for auto-login
-      lineinfile:
+      blockinfile:
         path: /etc/lightdm/lightdm.conf
-        line: "autologin-user=avelis"
-        create: yes
+        block: |
+          [Seat:*]
+          autologin-user=avelis
+          autologin-user-timeout=0
 
     - name: Enable LightDM
       systemd:
