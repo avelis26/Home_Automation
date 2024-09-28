@@ -220,8 +220,8 @@
 
     - name: Copy Term Profile
       copy:
-        src: matrix.json
-        dest: /home/avelis/.config/cool-retro-term/matrix.json
+        src: emby_term.json
+        dest: /home/avelis/.config/cool-retro-term/emby_term.json
         owner: avelis
         group: avelis
         mode: '0644'
@@ -240,7 +240,7 @@
         content: |
           [Desktop Entry]
           Type=Application
-          Exec=bash -c 'cool-retro-term --profile /home/avelis/.config/cool-retro-term/matrix.json --fullscreen -e btop'
+          Exec=bash -c 'cool-retro-term --profile /home/avelis/.config/cool-retro-term/emby_term.json --fullscreen -e btop'
           Hidden=false
           NoDisplay=false
           X-GNOME-Autostart-enabled=true
