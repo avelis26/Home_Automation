@@ -2,7 +2,7 @@
   become: yes
   vars_files:
     - secrets.yml
-  
+
   tasks:
     # SSH
     - name: Create SSH Directory
@@ -31,7 +31,7 @@
         path: /etc/sudoers
         line: 'avelis ALL=(ALL:ALL) NOPASSWD:ALL'
         validate: 'visudo -cf %s'
-    
+
     # APT
     - name: Update & Upgrade APT
       apt:
@@ -121,6 +121,8 @@
       user:
         name: "{{ item.username }}"
         state: present
+        groups: debian-transmission    # Add samba user to debian-transmission group
+        append: yes                    # Ensure the user is added to existing groups
       with_items:
         - "{{ samba_users }}"
       no_log: true
@@ -264,13 +266,31 @@
         - { path: "/var/lib/emby/temp" }
         - { path: "/mnt/data/emby/backup" }
 
-    - name: Set Torrent Directories
+    # Set Torrent Directories with correct permissions and setgid bit
+    - name: Set Torrent Directory Permissions
       file:
         path: /mnt/data/Torrents
         state: directory
         owner: debian-transmission
         group: debian-transmission
+        mode: '2775'          # Set setgid bit and permissions
+        recurse: no
+
+    - name: Set Permissions on Subdirectories
+      file:
+        path: /mnt/data/Torrents
+        state: directory
+        mode: '2775'
         recurse: yes
+        follow: yes
+
+    - name: Set Permissions on Files
+      file:
+        path: /mnt/data/Torrents
+        state: file
+        mode: '0664'
+        recurse: yes
+        follow: yes
 
     # Reboot
     - name: Reboot
