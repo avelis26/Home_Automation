@@ -121,8 +121,8 @@
       user:
         name: "{{ item.username }}"
         state: present
-        groups: debian-transmission    # Add samba user to debian-transmission group
-        append: yes                    # Ensure the user is added to existing groups
+        groups: debian-transmission
+        append: yes
       with_items:
         - "{{ samba_users }}"
       no_log: true
@@ -169,7 +169,7 @@
         name: transmission-daemon
         state: stopped
 
-    - name: Update Transmission Settings #test here - all above success
+    - name: Update Transmission Settings
       template:
         src: transmission_settings.json
         dest: /etc/transmission-daemon/settings.json
@@ -266,33 +266,11 @@
         - { path: "/var/lib/emby/temp" }
         - { path: "/mnt/data/emby/backup" }
 
-    # Set Torrent Directories with correct permissions and setgid bit
     - name: Set Torrent Directory Permissions
       file:
         path: /mnt/data/Torrents
         state: directory
         owner: debian-transmission
         group: debian-transmission
-        mode: '2775'          # Set setgid bit and permissions
-        recurse: no
-
-    - name: Set Permissions on Subdirectories
-      file:
-        path: /mnt/data/Torrents
-        state: directory
         mode: '2775'
         recurse: yes
-        follow: yes
-
-    # Set Permissions on Files
-    - name: Find Torrent Files
-      command: find /mnt/data/Torrents -type f
-      register: torrent_files
-
-    - name: Fix File Permissions
-      file:
-        path: "{{ item }}"
-        owner: debian-transmission
-        group: debian-transmission
-        mode: '0664'
-      loop: "{{ torrent_files.stdout_lines }}"
