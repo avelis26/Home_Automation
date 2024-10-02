@@ -284,17 +284,15 @@
         recurse: yes
         follow: yes
 
-    - name: Set Permissions on Files
-      find:
-        paths: /mnt/data/Torrents
-        recurse: yes
-        file_type: file
-        register: torrent_files
+    # Set Permissions on Files
+    - name: Find Torrent Files
+      command: find /mnt/data/Torrents -type f
+      register: torrent_files
 
     - name: Fix File Permissions
       file:
-        path: "{{ item.path }}"
+        path: "{{ item }}"
         owner: debian-transmission
         group: debian-transmission
         mode: '0664'
-      loop: "{{ torrent_files.files }}"
+      loop: "{{ torrent_files.stdout_lines }}"
