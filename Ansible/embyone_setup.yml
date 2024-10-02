@@ -285,14 +285,16 @@
         follow: yes
 
     - name: Set Permissions on Files
-      file:
-        path: /mnt/data/Torrents
-        state: file
-        mode: '0664'
+      find:
+        paths: /mnt/data/Torrents
         recurse: yes
-        follow: yes
+        file_type: file
+        register: torrent_files
 
-    # Reboot
-    - name: Reboot
-      reboot:
-        msg: "Rebooting system..."
+    - name: Fix File Permissions
+      file:
+        path: "{{ item.path }}"
+        owner: debian-transmission
+        group: debian-transmission
+        mode: '0664'
+      loop: "{{ torrent_files.files }}"
