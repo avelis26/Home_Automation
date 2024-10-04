@@ -1,0 +1,88 @@
+---
+- name: Set up MS SQL Server with Docker and restore AdventureWorks database
+  hosts: localhost
+  become: true
+  vars:
+    mssql_sa_password: "{{ lookup('env', 'MSSQL_SA_PASSWORD') }}"
+    sql_database_dir: "/home/avelis/sql_database"
+    backup_file: "AdventureWorks2019.bak"
+    adventureworks_url: "https://github.com/Microsoft/sql-server-samples/releases/download/adventureworks/AdventureWorks2019.bak"
+
+  tasks:
+    - name: Check if the SA_PASSWORD environment variable is set
+      assert:
+        that:
+          - mssql_sa_password is defined
+        fail_msg: "Error: SA_PASSWORD environment variable is not set."
+
+    - name: Create directory for SQL Server data
+      file:
+        path: "{{ sql_database_dir }}"
+        state: directory
+        owner: 10001
+        group: 0
+
+    - name: Update and install Docker
+      apt:
+        update_cache: yes
+        upgrade: dist
+        name: docker.io
+        state: present
+
+    - name: Enable and start Docker service
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Pull MS SQL Server Docker image
+      docker_image:
+        name: mcr.microsoft.com/mssql/server
+        tag: 2022-latest
+        source: pull
+
+    - name: Run SQL Server Docker container
+      docker_container:
+        name: mssqlserver
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        state: started
+        restart_policy: always
+        exposed_ports:
+          - 1433
+        published_ports:
+          - "1433:1433"
+        env:
+          ACCEPT_EULA: Y
+          SA_PASSWORD: "{{ mssql_sa_password }}"
+        volumes:
+          - "{{ sql_database_dir }}:/var/opt/mssql"
+
+    - name: Allow SQL Server port on the firewall
+      ufw:
+        rule: allow
+        name: "SQL Server"
+        port: 1433
+
+    - name: Download AdventureWorks backup
+      get_url:
+        url: "{{ adventureworks_url }}"
+        dest: "{{ backup_file }}"
+
+    - name: Copy backup file to SQL Server container
+      docker_cp:
+        src: "{{ backup_file }}"
+        dest: "/var/opt/mssql/backup/"
+        container: mssqlserver
+
+    - name: Restore AdventureWorks2019 database
+      shell: |
+        /opt/mssql-tools18/bin/sqlcmd -S localhost -U SA -P "{{ mssql_sa_password }}" -C -Q "
+        RESTORE DATABASE AdventureWorks2019 
+        FROM DISK = '/var/opt/mssql/backup/AdventureWorks2019.bak' 
+        WITH MOVE 'AdventureWorks2019' TO '/var/opt/mssql/data/AdventureWorks2019.mdf',
+        MOVE 'AdventureWorks2019_log' TO '/var/opt/mssql/data/AdventureWorks2019.ldf';
+        SELECT name FROM sys.databases;
+        "
+      args:
+        executable: /bin/bash
+
