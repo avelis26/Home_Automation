@@ -1,20 +1,15 @@
 ---
-- name: Set up MS SQL Server with Docker and restore AdventureWorks database
-  hosts: localhost
+- name: Install MS SQL Server, Docker, and AdventureWorks database
+  hosts: embyone
   become: true
   vars:
-    mssql_sa_password: "{{ lookup('env', 'MSSQL_SA_PASSWORD') }}"
-    sql_database_dir: "/home/avelis/sql_database"
+    sql_database_dir: "/home/{{ linux_user }}/sql_database"
     backup_file: "AdventureWorks2019.bak"
     adventureworks_url: "https://github.com/Microsoft/sql-server-samples/releases/download/adventureworks/AdventureWorks2019.bak"
+  vars_files:
+    - secrets.yml
 
   tasks:
-    - name: Check if the SA_PASSWORD environment variable is set
-      assert:
-        that:
-          - mssql_sa_password is defined
-        fail_msg: "Error: SA_PASSWORD environment variable is not set."
-
     - name: Create directory for SQL Server data
       file:
         path: "{{ sql_database_dir }}"

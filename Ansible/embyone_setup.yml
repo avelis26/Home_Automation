@@ -7,21 +7,21 @@
     # SSH
     - name: Create SSH Directory
       file:
-        path: /home/avelis/.ssh
+        path: /home/{{ linux_user }}/.ssh
         state: directory
-        owner: avelis
-        group: avelis
+        owner: "{{ linux_user }}"
+        group: "{{ linux_user }}"
         mode: '0700'
 
     - name: Add Gaming-PC SSH Key
       authorized_key:
-        user: avelis
+        user: "{{ linux_user }}"
         key: "{{ item }}"
       loop: "{{ ssh_keys }}"
 
     - name: Add Pi-Star SSH Key
       authorized_key:
-        user: avelis
+        user: "{{ linux_user }}"
         state: present
         key: "{{ lookup('file', '/home/pi-star/.ssh/id_rsa.pub') }}"
       delegate_to: embyone
@@ -29,7 +29,7 @@
     - name: Add User To Sudoers
       lineinfile:
         path: /etc/sudoers
-        line: 'avelis ALL=(ALL:ALL) NOPASSWD:ALL'
+        line: "{{ linux_user }} ALL=(ALL:ALL) NOPASSWD:ALL"
         validate: 'visudo -cf %s'
 
     # APT
@@ -105,7 +105,7 @@
     # Bashrc
     - name: Update BASHRC
       lineinfile:
-        path: /home/avelis/.bashrc
+        path: "/home/{{ linux_user }}/.bashrc"
         line: "{{ item }}"
         create: yes
         insertafter: EOF
@@ -114,7 +114,7 @@
         - 'alias ll="ls -lhAp --color=always"'
         - 'alias update="sudo apt update -y && sudo apt full-upgrade -y && sudo apt autoremove -y"'
         - 'alias nvtop="gpustat -a -i 1"'
-        - 'export PATH="$PATH:/home/avelis/.local/bin"'
+        - 'export PATH="$PATH:/home/{{ linux_user }}/.local/bin"'
 
     # Samba
     - name: Create Samba User
@@ -195,7 +195,7 @@
         dest: /etc/lightdm/lightdm.conf
         content: |
           [Seat:*]
-          autologin-user=avelis
+          autologin-user={{ linux_user }}
           autologin-user-timeout=0
         mode: '0644'
 
@@ -214,42 +214,42 @@
 
     - name: Create Term Config Directory
       file:
-        path: /home/avelis/.config/cool-retro-term
+        path: "/home/{{ linux_user }}/.config/cool-retro-term"
         state: directory
-        owner: avelis
-        group: avelis
+        owner: "{{ linux_user }}"
+        group: "{{ linux_user }}"
         mode: '0755'
 
     - name: Copy Term Profile
       copy:
         src: emby_term.json
-        dest: /home/avelis/.config/cool-retro-term/emby_term.json
-        owner: avelis
-        group: avelis
+        dest: "/home/{{ linux_user }}/.config/cool-retro-term/emby_term.json"
+        owner: "{{ linux_user }}"
+        group: "{{ linux_user }}"
         mode: '0644'
 
     - name: Create Autostart Directory
       file:
-        path: /home/avelis/.config/autostart
+        path: "/home/{{ linux_user }}/.config/autostart"
         state: directory
-        owner: avelis
-        group: avelis
+        owner: "{{ linux_user }}"
+        group: "{{ linux_user }}"
         mode: '0755'
 
     - name: Create Term Autostart
       copy:
-        dest: /home/avelis/.config/autostart/cool-retro-term.desktop
+        dest: "/home/{{ linux_user }}/.config/autostart/cool-retro-term.desktop"
         content: |
           [Desktop Entry]
           Type=Application
-          Exec=bash -c 'cool-retro-term --profile /home/avelis/.config/cool-retro-term/emby_term.json --fullscreen -e btop'
+          Exec=bash -c 'cool-retro-term --profile /home/{{ linux_user }}/.config/cool-retro-term/emby_term.json --fullscreen -e btop'
           Hidden=false
           NoDisplay=false
           X-GNOME-Autostart-enabled=true
           Name=Cool Retro Term
           Comment=Launch cool-retro-term on desktop login
-        owner: avelis
-        group: avelis
+        owner: "{{ linux_user }}"
+        group: "{{ linux_user }}"
         mode: '0644'
 
     # Directories
