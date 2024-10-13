@@ -275,6 +275,24 @@
         mode: '2775'
         recurse: yes
 
+    - name: Set Movies Directory Permissions
+      file:
+        path: /mnt/data/Media/Movies
+        state: directory
+        owner: avelis
+        group: samba
+        mode: '2775'
+        recurse: yes
+
+    - name: Set Shows Directory Permissions
+      file:
+        path: /mnt/data/Media/Shows
+        state: directory
+        owner: avelis
+        group: samba
+        mode: '2775'
+        recurse: yes
+
     # Reboot
     - name: Reboot
       reboot:
