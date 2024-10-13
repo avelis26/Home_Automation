@@ -220,14 +220,6 @@
         group: "{{ linux_user }}"
         mode: '0755'
 
-    #- name: Copy Term Profile
-    #  copy:
-    #    src: emby_term.json
-    #    dest: "/home/{{ linux_user }}/.config/cool-retro-term/emby_term.json"
-    #    owner: "{{ linux_user }}"
-    #    group: "{{ linux_user }}"
-    #    mode: '0644'
-
     - name: Create Autostart Directory
       file:
         path: "/home/{{ linux_user }}/.config/autostart"
