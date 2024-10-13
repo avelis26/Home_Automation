@@ -220,13 +220,13 @@
         group: "{{ linux_user }}"
         mode: '0755'
 
-    - name: Copy Term Profile
-      copy:
-        src: emby_term.json
-        dest: "/home/{{ linux_user }}/.config/cool-retro-term/emby_term.json"
-        owner: "{{ linux_user }}"
-        group: "{{ linux_user }}"
-        mode: '0644'
+    #- name: Copy Term Profile
+    #  copy:
+    #    src: emby_term.json
+    #    dest: "/home/{{ linux_user }}/.config/cool-retro-term/emby_term.json"
+    #    owner: "{{ linux_user }}"
+    #    group: "{{ linux_user }}"
+    #    mode: '0644'
 
     - name: Create Autostart Directory
       file:
@@ -242,7 +242,7 @@
         content: |
           [Desktop Entry]
           Type=Application
-          Exec=bash -c 'cool-retro-term --profile /home/{{ linux_user }}/.config/cool-retro-term/emby_term.json --fullscreen -e btop'
+          Exec=bash -c 'cool-retro-term --profile Futuristic --fullscreen -e btop'
           Hidden=false
           NoDisplay=false
           X-GNOME-Autostart-enabled=true
