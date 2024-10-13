@@ -274,3 +274,8 @@
         group: debian-transmission
         mode: '2775'
         recurse: yes
+
+    # Reboot
+    - name: Reboot
+      reboot:
+        msg: "Rebooting system..."
