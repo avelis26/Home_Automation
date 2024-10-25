@@ -123,6 +123,7 @@
         state: present
         groups: debian-transmission
         append: yes
+        create_home: no
       with_items:
         - "{{ samba_users }}"
       no_log: true
@@ -140,7 +141,7 @@
         state: directory
         owner: samba
         group: samba
-        mode: "0777"
+        mode: "2775"
 
     - name: Configure Samba Share
       blockinfile:
