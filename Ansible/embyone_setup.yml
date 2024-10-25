@@ -116,7 +116,7 @@
         - 'alias nvtop="gpustat -a -i 1"'
         - 'export PATH="$PATH:/home/{{ linux_user }}/.local/bin"'
 
-    # Samba
+    # Samba # sudo usermod -a -G debian-transmission samba
     - name: Create Samba User
       user:
         name: "{{ item.username }}"
