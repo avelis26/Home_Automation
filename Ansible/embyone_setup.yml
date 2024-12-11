@@ -286,6 +286,15 @@
         mode: '2775'
         recurse: yes
 
+    - name: Set Sports Directory Permissions
+      file:
+        path: /mnt/data/Media/Sports
+        state: directory
+        owner: avelis
+        group: samba
+        mode: '2775'
+        recurse: yes
+
     # Reboot
     - name: Reboot
       reboot:
