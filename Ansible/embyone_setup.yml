@@ -246,6 +246,22 @@
         mode: '0644'
 
     # Directories
+    - name: Create a shared media group
+      group:
+        name: media_access
+        state: present
+    
+    - name: Add users to media_access group
+      user:
+        name: "{{ item }}"
+        groups: media_access
+        append: yes
+      loop:
+        - emby
+        - debian-transmission
+        - avelis
+        - samba
+
     - name: Set Emby Directories
       file:
         path: "{{ item.path }}"
@@ -259,41 +275,19 @@
         - { path: "/var/lib/emby/temp" }
         - { path: "/mnt/data/emby/backup" }
 
-    - name: Set Torrent Directory Permissions
+    - name: Set Directory Permissions
       file:
-        path: /mnt/data/Torrents
+        path: "{{ item.path }}"
         state: directory
-        owner: debian-transmission
-        group: debian-transmission
+        owner: "{{ item.owner }}"
+        group: media_access
         mode: '2775'
         recurse: yes
-
-    - name: Set Movies Directory Permissions
-      file:
-        path: /mnt/data/Media/Movies
-        state: directory
-        owner: avelis
-        group: samba
-        mode: '2775'
-        recurse: yes
-
-    - name: Set Shows Directory Permissions
-      file:
-        path: /mnt/data/Media/Shows
-        state: directory
-        owner: avelis
-        group: samba
-        mode: '2775'
-        recurse: yes
-
-    - name: Set Sports Directory Permissions
-      file:
-        path: /mnt/data/Media/Sports
-        state: directory
-        owner: avelis
-        group: samba
-        mode: '2775'
-        recurse: yes
+      loop:
+        - { path: "/mnt/data/Torrents", owner: "debian-transmission" }
+        - { path: "/mnt/data/Media/Movies", owner: "avelis" }
+        - { path: "/mnt/data/Media/Shows", owner: "avelis" }
+        - { path: "/mnt/data/Media/Sports", owner: "avelis" }
 
     # Reboot
     - name: Reboot
