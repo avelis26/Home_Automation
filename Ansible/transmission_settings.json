@@ -75,7 +75,7 @@
     "tcp-enabled": true,
     "torrent-added-verify-mode": "fast",
     "trash-original-torrent-files": false,
-    "umask": "022",
+    "umask": "0",
     "upload-limit": 100,
     "upload-limit-enabled": 0,
     "upload-slots-per-torrent": 8,
