@@ -1,7 +1,7 @@
 - hosts: embyone
   become: yes
   vars_files:
-    - secrets.yml
+    - secrets_one.yml
 
   tasks:
     # SSH
@@ -71,12 +71,12 @@
         update_cache: yes
 
     # NVIDIA
-    - name: Install NVIDIA Driver
-      apt:
-        name: "nvidia-driver-535-server"
-        state: present
-        update_cache: yes
-      register: nvidia_install
+    #- name: Install NVIDIA Driver
+    #  apt:
+    #    name: "nvidia-driver-535-server"
+    #    state: present
+    #    update_cache: yes
+    #  register: nvidia_install
 
     # Emby
     - name: Confirm Emby

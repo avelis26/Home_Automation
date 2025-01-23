@@ -1,0 +1,149 @@
+- hosts: embytwo
+  become: yes
+  vars_files:
+    - secrets_two.yml
+
+  tasks:
+    # SSH
+    - name: Create SSH Directory
+      file:
+        path: /home/{{ linux_user }}/.ssh
+        state: directory
+        owner: "{{ linux_user }}"
+        group: "{{ linux_user }}"
+        mode: '0700'
+
+    - name: Add Gaming-PC SSH Key
+      authorized_key:
+        user: "{{ linux_user }}"
+        key: "{{ item }}"
+      loop: "{{ ssh_keys }}"
+
+    - name: Add Pi-Star SSH Key
+      authorized_key:
+        user: "{{ linux_user }}"
+        state: present
+        key: "{{ lookup('file', '/home/pi-star/.ssh/id_rsa.pub') }}"
+      delegate_to: embytwo
+
+    - name: Add User To Sudoers
+      lineinfile:
+        path: /etc/sudoers
+        line: "{{ linux_user }} ALL=(ALL:ALL) NOPASSWD:ALL"
+        validate: 'visudo -cf %s'
+
+    # APT
+    - name: Update & Upgrade APT
+      apt:
+        update_cache: yes
+        upgrade: dist
+      register: apt_update_upgrade
+
+    # Packages
+    - name: Install Base Packages
+      apt:
+        name:
+          - htop
+          - nano
+          - ffmpeg
+          - iputils-ping
+          - btop
+          - curl
+          - git
+          - python3-full
+          - whois
+          - traceroute
+          - gcc
+          - make
+        state: present
+        update_cache: yes
+
+    # Emby
+    - name: Confirm Emby
+      shell: dpkg -l | grep emby-server
+      register: emby_installed
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Download Emby
+      get_url:
+        url: https://github.com/MediaBrowser/Emby.Releases/releases/download/4.8.9.0/emby-server-deb_4.8.9.0_amd64.deb
+        dest: /tmp/emby-server-deb_4.8.9.0_amd64.deb
+      when: emby_installed.rc != 0
+
+    - name: Install Emby
+      apt:
+        deb: /tmp/emby-server-deb_4.8.9.0_amd64.deb
+      when: emby_installed.rc != 0
+
+    # Reboot if necessary
+    - name: Reboot Conditionally
+      reboot:
+        msg: "Rebooting system..."
+      when: apt_update_upgrade.changed or nvidia_install.changed or emby_installed.rc != 0
+
+    # Bashrc
+    - name: Update BASHRC
+      lineinfile:
+        path: "/home/{{ linux_user }}/.bashrc"
+        line: "{{ item }}"
+        create: yes
+        insertafter: EOF
+      loop:
+        - 'alias ls="ls -lhAp --color=always"'
+        - 'alias ll="ls -lhAp --color=always"'
+        - 'alias update="sudo apt update -y && sudo apt full-upgrade -y && sudo apt autoremove -y"'
+        - 'export PATH="$PATH:/home/{{ linux_user }}/.local/bin"'
+
+    # Fstab
+    - name: Edit FSTAB
+      mount:
+        path: /mnt/data
+        src: /dev/mapper/vg_data-lv_data
+        fstype: ext4
+        opts: defaults
+        state: mounted
+
+    # Directories
+    - name: Create a shared media group
+      group:
+        name: media_access
+        state: present
+    
+    - name: Add users to media_access group
+      user:
+        name: "{{ item }}"
+        groups: media_access
+        append: yes
+      loop:
+        - emby
+        - grace
+
+    - name: Set Emby Directories
+      file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: emby
+        group: emby
+        mode: '0755'
+      loop:
+        - { path: "/var/lib/emby/metadata" }
+        - { path: "/var/lib/emby/temp" }
+
+    - name: Set Directory Permissions
+      file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: media_access
+        mode: '2775'
+        recurse: yes
+      loop:
+        - { path: "/mnt/data/Media/Movies", owner: "grace" }
+        - { path: "/mnt/data/Media/Shows", owner: "grace" }
+        - { path: "/mnt/data/Media/Sports", owner: "grace" }
+
+    # Reboot
+    - name: Reboot
+      reboot:
+        msg: "Rebooting system..."
