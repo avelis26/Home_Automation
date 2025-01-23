@@ -80,7 +80,7 @@
     - name: Reboot Conditionally
       reboot:
         msg: "Rebooting system..."
-      when: apt_update_upgrade.changed or nvidia_install.changed or emby_installed.rc != 0
+      when: apt_update_upgrade.changed or emby_installed.rc != 0
 
     # Bashrc
     - name: Update BASHRC
