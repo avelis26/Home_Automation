@@ -99,7 +99,7 @@
     - name: Edit FSTAB
       mount:
         path: /mnt/data
-        src: /dev/mapper/vg_data-lv_data
+        src: /dev/sda1
         fstype: ext4
         opts: defaults
         state: mounted
