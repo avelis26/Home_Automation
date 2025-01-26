@@ -9,7 +9,7 @@ all:
       ansible_ssh_pass: "{{ lookup('file', '/home/pi-star/source/Home_Automation/Ansible/secrets_one.yml') | from_yaml | json_query('ansible_ssh_pass') }}"
 
     embytwo:
-      ansible_host: 192.168.50.175
+      ansible_host: 10.243.187.150
       ansible_user: grace
       ansible_become: true
       ansible_ssh_private_key_file: /home/pi-star/.ssh/id_rsa
