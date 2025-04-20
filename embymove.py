@@ -2,6 +2,8 @@
 # ./embymove.py --user "grace" --server "embytwo" --input "/mnt/data/Torrents/Complete/embymove-text.txt" --output "/mnt/data/Media/Sports/NHL/"
 # ./embymove.py --user "grace" --server "embytwo" --input "/mnt/data/Torrents/Complete/NHL-2025-04-19.R1.G1_COL@DAL_TNT.mkv" --output "/mnt/data/Media/Sports/NHL/"
 
+#!/usr/bin/env python3
+
 import paramiko
 import hashlib
 import os
@@ -11,6 +13,9 @@ import time
 import argparse
 from datetime import datetime
 from tzlocal import get_localzone
+
+# Suppress paramiko debug logging
+logging.getLogger('paramiko').setLevel(logging.WARNING)
 
 # Configure logging with local timezone
 local_tz = get_localzone()
@@ -53,9 +58,6 @@ def copy_file(input_path, output_path, dest_user, dest_server, max_retries=10):
     # Construct destination path for SSH
     dest_path = f"{dest_user}@{dest_server}:{output_path}"
     
-    ssh_client = paramiko.SSHClient()
-    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    
     attempt = 0
     success = False
     
@@ -64,14 +66,24 @@ def copy_file(input_path, output_path, dest_user, dest_server, max_retries=10):
     
     while attempt < max_retries and not success:
         attempt += 1
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
         try:
+            # Configure SSH connection with timeout and keepalive
+            ssh_client.connect(
+                dest_server,
+                username=dest_user,
+                timeout=30,
+                look_for_keys=True,
+                allow_agent=True
+            )
+            ssh_client.get_transport().set_keepalive(60)
+            
             # Calculate source file hash (local file on embyone)
             source_hash = calculate_file_hash(input_path)
             
-            # Connect to destination server
-            ssh_client.connect(dest_server, username=dest_user)
             sftp = ssh_client.open_sftp()
-            
             try:
                 # Ensure destination directory exists
                 dest_dir = os.path.dirname(output_path)
@@ -82,6 +94,7 @@ def copy_file(input_path, output_path, dest_user, dest_server, max_retries=10):
                     sftp.mkdir(dest_dir)
                 
                 # Copy file
+                logging.info(f"EmbyMove - Starting file transfer to {dest_path}")
                 sftp.put(input_path, output_path)
                 
                 # Verify copy by comparing hashes
@@ -100,14 +113,20 @@ def copy_file(input_path, output_path, dest_user, dest_server, max_retries=10):
                 
             finally:
                 sftp.close()
-                ssh_client.close()
                 
         except Exception as e:
             logging.error(f"EmbyMove - SSH copy operation interrupted!!! Error: {str(e)}")
             time.sleep(30)  # Wait before retry
             if attempt < max_retries:
                 logging.info(f"EmbyMove - Retrying attempt {attempt + 1}/{max_retries}")
-            continue
+                
+        finally:
+            try:
+                ssh_client.close()
+            except:
+                pass
+            # Ensure client is fully closed
+            ssh_client = None
     
     return success
 
