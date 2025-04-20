@@ -9,14 +9,27 @@ import sys
 import logging
 import time
 import argparse
+from datetime import datetime
+from tzlocal import get_localzone
 
-# Configure logging
-logging.basicConfig(
-    filename='/var/log/embymove.log',
-    level=logging.INFO,
-    format='%(asctime)s - %(message)s',
+# Configure logging with local timezone
+local_tz = get_localzone()
+formatter = logging.Formatter(
+    fmt='%(asctime)s - %(message)s',
     datefmt='%Y%m%d_%H%M'
 )
+formatter.converter = lambda *args: datetime.now(local_tz).timetuple()
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+# Clear any existing handlers to avoid duplicate logs
+logger.handlers = []
+
+# Create file handler
+file_handler = logging.FileHandler('/var/log/embymove.log')
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
 
 def calculate_file_hash(file_path, ssh_client=None):
     """Calculate SHA256 hash of a file, handling both local and remote files."""
@@ -91,7 +104,7 @@ def copy_file(input_path, output_path, dest_user, dest_server, max_retries=10):
                 
         except Exception as e:
             logging.error(f"EmbyMove - SSH copy operation interrupted!!! Error: {str(e)}")
-            time.sleep(300)  # Wait before retry
+            time.sleep(30)  # Wait before retry
             if attempt < max_retries:
                 logging.info(f"EmbyMove - Retrying attempt {attempt + 1}/{max_retries}")
             continue
