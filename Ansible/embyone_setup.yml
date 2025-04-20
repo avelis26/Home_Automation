@@ -67,6 +67,8 @@
           - gcc
           - make
           - cool-retro-term
+          - python3-tzlocal
+          - python3-paramiko
         state: present
         update_cache: yes
 
