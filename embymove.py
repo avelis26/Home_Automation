@@ -63,17 +63,25 @@ def copy_file(input_path, output_path, dest_user, dest_server, max_retries=10):
             
             # Copy file using scp with quiet mode
             logging.info(f"EmbyMove - Starting file transfer to {dest_path}")
+            start_time = time.time()
             subprocess.run(
                 f"scp -q {input_path} {dest_path}",
                 shell=True, check=True
             )
+            transfer_duration = time.time() - start_time
             
             # Verify copy
             dest_hash = calculate_file_hash(dest_file_path, is_remote=True, dest_user=dest_user, dest_server=dest_server)
             
             if source_hash == dest_hash:
                 success = True
-                logging.info("EmbyMove - SSH copy operation completed successfully")
+                # Log file details
+                file_size_mb = os.path.getsize(input_path) / (1024 * 1024)  # Size in MB
+                logging.info(
+                    f"EmbyMove - SSH copy operation completed successfully: "
+                    f"File '{filename}' copied from {input_path} to {dest_path}, "
+                    f"Size: {file_size_mb:.2f} MB, Duration: {transfer_duration:.2f} seconds"
+                )
             else:
                 logging.error("EmbyMove - Hash verification failed")
                 subprocess.run(f"ssh {dest_user}@{dest_server} 'rm {dest_file_path}'", shell=True)
