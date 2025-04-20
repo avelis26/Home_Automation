@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-# ./embymove.py --user "grace" --server "embytwo" --input "/mnt/data/Torrents/Complete/embymove-text.txt" --output "/mnt/data/Media/Sports/NHL/"
-# ./embymove.py --user "grace" --server "embytwo" --input "/mnt/data/Torrents/Complete/NHL-2025-04-19.R1.G1_COL@DAL_TNT.mkv" --output "/mnt/data/Media/Sports/NHL/"
 
-import paramiko
+import subprocess
 import hashlib
 import os
 import sys
@@ -12,119 +10,78 @@ import argparse
 from datetime import datetime
 from tzlocal import get_localzone
 
-# Suppress paramiko debug logging
-logging.getLogger('paramiko').setLevel(logging.WARNING)
+# Suppress subprocess noise
+logging.getLogger().setLevel(logging.INFO)
 
 # Configure logging with local timezone
 local_tz = get_localzone()
-formatter = logging.Formatter(
-    fmt='%(asctime)s - %(message)s',
-    datefmt='%Y%m%d_%H%M'
-)
+formatter = logging.Formatter(fmt='%(asctime)s - %(message)s', datefmt='%Y%m%d_%H%M')
 formatter.converter = lambda *args: datetime.now(local_tz).timetuple()
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
-# Clear any existing handlers to avoid duplicate logs
 logger.handlers = []
-
-# Create file handler
 file_handler = logging.FileHandler('/var/log/embymove.log')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
-def calculate_file_hash(file_path, ssh_client=None):
-    """Calculate SHA256 hash of a file, handling both local and remote files."""
+def calculate_file_hash(file_path, is_remote=False, dest_user=None, dest_server=None):
+    """Calculate SHA256 hash of a file."""
     sha256 = hashlib.sha256()
-    if ssh_client:  # Remote file
-        sftp = ssh_client.open_sftp()
-        try:
-            with sftp.file(file_path, 'rb') as f:
-                while chunk := f.read(8192):
-                    sha256.update(chunk)
-        finally:
-            sftp.close()
-    else:  # Local file
+    if is_remote:
+        cmd = f"ssh {dest_user}@{dest_server} 'cat {file_path}'"
+        process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+        while chunk := process.stdout.read(8192):
+            sha256.update(chunk)
+        process.wait()
+    else:
         with open(file_path, 'rb') as f:
             while chunk := f.read(8192):
                 sha256.update(chunk)
     return sha256.hexdigest()
 
 def copy_file(input_path, output_path, dest_user, dest_server, max_retries=10):
-    """Copy file with retry mechanism and verification."""
-    # Construct destination path for SSH
+    """Copy file using scp with retry and verification."""
     dest_path = f"{dest_user}@{dest_server}:{output_path}"
-    
     attempt = 0
     success = False
     
-    # Log start of operation
-    logging.info(f"EmbyMove - SSH copy operation started")
+    logging.info("EmbyMove - SSH copy operation started")
     
     while attempt < max_retries and not success:
         attempt += 1
-        ssh_client = paramiko.SSHClient()
-        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
         try:
-            # Configure SSH connection with timeout and keepalive
-            ssh_client.connect(
-                dest_server,
-                username=dest_user,
-                timeout=30,
-                look_for_keys=True,
-                allow_agent=True
-            )
-            ssh_client.get_transport().set_keepalive(60)
-            
-            # Calculate source file hash (local file on embyone)
+            # Calculate source hash
             source_hash = calculate_file_hash(input_path)
             
-            sftp = ssh_client.open_sftp()
-            try:
-                # Ensure destination directory exists
-                dest_dir = os.path.dirname(output_path)
-                try:
-                    sftp.stat(dest_dir)
-                except IOError:
-                    # Create directory if it doesn't exist
-                    sftp.mkdir(dest_dir)
-                
-                # Copy file
-                logging.info(f"EmbyMove - Starting file transfer to {dest_path}")
-                sftp.put(input_path, output_path)
-                
-                # Verify copy by comparing hashes
-                dest_hash = calculate_file_hash(output_path, ssh_client)
-                
-                if source_hash == dest_hash:
-                    success = True
-                    logging.info(f"EmbyMove - SSH copy operation completed successfully")
-                else:
-                    logging.error("EmbyMove - Hash verification failed")
-                    # Remove failed copy
-                    try:
-                        sftp.remove(output_path)
-                    except:
-                        pass
-                
-            finally:
-                sftp.close()
+            # Ensure destination directory exists
+            subprocess.run(
+                f"ssh {dest_user}@{dest_server} 'mkdir -p {os.path.dirname(output_path)}'",
+                shell=True, check=True
+            )
+            
+            # Copy file using scp
+            logging.info(f"EmbyMove - Starting file transfer to {dest_path}")
+            subprocess.run(
+                f"scp {input_path} {dest_path}",
+                shell=True, check=True
+            )
+            
+            # Verify copy
+            dest_hash = calculate_file_hash(output_path, is_remote=True, dest_user=dest_user, dest_server=dest_server)
+            
+            if source_hash == dest_hash:
+                success = True
+                logging.info("EmbyMove - SSH copy operation completed successfully")
+            else:
+                logging.error("EmbyMove - Hash verification failed")
+                subprocess.run(f"ssh {dest_user}@{dest_server} 'rm {output_path}'", shell=True)
                 
         except Exception as e:
             logging.error(f"EmbyMove - SSH copy operation interrupted!!! Error: {str(e)}")
-            time.sleep(30)  # Wait before retry
+            time.sleep(30)
             if attempt < max_retries:
                 logging.info(f"EmbyMove - Retrying attempt {attempt + 1}/{max_retries}")
-                
-        finally:
-            try:
-                ssh_client.close()
-            except:
-                pass
-            # Ensure client is fully closed
-            ssh_client = None
     
     return success
 
