@@ -39,6 +39,13 @@
         upgrade: dist
       register: apt_update_upgrade
 
+    # Snap
+    - name: Update and upgrade Snap packages
+      command: snap refresh
+      register: snap_refresh
+      changed_when: "'All snaps up to date' not in snap_refresh.stdout"
+      tags: [packages]
+
     # Packages
     - name: Install Base Packages
       apt:
@@ -71,29 +78,46 @@
     #  register: nvidia_install
 
     # Emby
-    - name: Confirm Emby
-      shell: dpkg -l | grep emby-server
-      register: emby_installed
-      ignore_errors: yes
+    - name: Check installed Emby version
+      command: dpkg -l emby-server | grep '^ii' | awk '{print $3}'
+      register: emby_version_check
       changed_when: false
+      failed_when: false
+      tags: [emby]
 
-    - name: Download Emby
+    - name: Set Emby version fact
+      set_fact:
+        current_emby_version: "{{ emby_version_check.stdout | default('none') }}"
+      tags: [emby]
+
+    - name: Download Emby .deb
       get_url:
-        url: https://github.com/MediaBrowser/Emby.Releases/releases/download/4.8.9.0/emby-server-deb_4.8.9.0_amd64.deb
-        dest: /tmp/emby-server-deb_4.8.9.0_amd64.deb
-      when: emby_installed.rc != 0
+        url: "{{ emby_deb_url }}"
+        dest: "{{ emby_deb_path }}"
+      when: current_emby_version != emby_version
+      tags: [emby]
 
-    - name: Install Emby
+    - name: Install or update Emby
       apt:
-        deb: /tmp/emby-server-deb_4.8.9.0_amd64.deb
-      when: emby_installed.rc != 0
+        deb: "{{ emby_deb_path }}"
+      when: current_emby_version != emby_version
+      notify: Restart Emby
+      register: emby_install
+      tags: [emby]
+
+    - name: Reboot if necessary
+      reboot:
+        msg: "Rebooting system..."
+      when: apt_update.changed or snap_refresh.changed or emby_install.changed
+      tags: [reboot]
+      #nvidia_install.changed
 
     # Reboot if necessary
     #- name: Reboot Conditionally
       #reboot:
         #msg: "Rebooting system..."
       #when: apt_update_upgrade.changed or emby_installed.rc != 0
-      #when: apt_update_upgrade.changed or nvidia_install.changed or emby_installed.rc != 0
+      #when: apt_update_upgrade.changed or  or emby_installed.rc != 0
 
     # Bashrc
     - name: Update BASHRC
@@ -109,7 +133,7 @@
         - 'alias nvtop="gpustat -a -i 1"'
         - 'export PATH="$PATH:/home/{{ linux_user }}/.local/bin"'
 
-    # Samba # sudo usermod -a -G debian-transmission samba
+    # Samba
     - name: Create Samba User
       user:
         name: "{{ item.username }}"
@@ -231,3 +255,11 @@
     - name: Reboot
       reboot:
         msg: "Rebooting system..."
+
+  handlers:
+  - name: Restart Emby
+    systemd:
+      name: emby-server
+      state: restarted
+      enabled: yes
+    tags: [emby]
