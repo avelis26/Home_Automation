@@ -51,6 +51,14 @@
         line: "{{ linux_user }} ALL=(ALL:ALL) NOPASSWD:ALL"
         validate: 'visudo -cf %s'
       tags: [ssh]
+    - name: Create getty service directory
+      file:
+        path: /etc/systemd/system/getty@tty1.service.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      tags: [autologin]
     - name: Configure auto-login for avelis on TTY1
       copy:
         dest: /etc/systemd/system/getty@tty1.service.d/autologin.conf
