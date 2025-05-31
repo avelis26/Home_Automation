@@ -51,13 +51,16 @@
         line: "{{ linux_user }} ALL=(ALL:ALL) NOPASSWD:ALL"
         validate: 'visudo -cf %s'
       tags: [ssh]
-    - name: Update & Upgrade APT
+    - name: Update APT cache and upgrade
       apt:
-        name: "{{ base_packages }}"
-        state: present
         update_cache: yes
         upgrade: dist
       register: apt_update_upgrade
+      tags: [packages]
+    - name: Install Base Packages
+      apt:
+        name: "{{ base_packages }}"
+        state: present
       tags: [packages]
     - name: Update and upgrade Snap packages
       command: snap refresh
