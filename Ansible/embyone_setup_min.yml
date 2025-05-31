@@ -1,102 +1,85 @@
+---
+# Playbook to set up an Emby media server with Samba, Transmission, and LVM
+# Prerequisites: Ubuntu Server, LVM volume /dev/mapper/vg_data-lv_data, secrets_one.yml
 - hosts: embyone
   become: yes
   vars_files:
     - secrets_one.yml
-
+  vars:
+    emby_version: 4.8.9.0
+    emby_deb_url: "https://github.com/MediaBrowser/Emby.Releases/releases/download/{{ emby_version }}/emby-server-deb_{{ emby_version }}_amd64.deb"
+    emby_deb_path: "/tmp/emby-server-deb_{{ emby_version }}_amd64.deb"
+    mount_point: /mnt/data
+    lvm_device: /dev/mapper/vg_data-lv_data
+    filesystem_type: ext4
+    base_packages:
+      - gpustat
+      - nano
+      - ffmpeg
+      - iputils-ping
+      - btop
+      - samba
+      - transmission-daemon
+      - curl
+      - git
+      - python3-full
+      - whois
+      - traceroute
+      - gcc
+      - make
+      - python3-tzlocal
+      - python3-paramiko
   tasks:
-    # SSH
     - name: Create SSH Directory
       file:
-        path: /home/{{ linux_user }}/.ssh
+        path: "/home/{{ linux_user }}/.ssh"
         state: directory
         owner: "{{ linux_user }}"
         group: "{{ linux_user }}"
         mode: '0700'
-
-    - name: Add Gaming-PC SSH Key
+      tags: [ssh]
+    - name: Add SSH keys
       authorized_key:
         user: "{{ linux_user }}"
         key: "{{ item }}"
-      loop: "{{ ssh_keys }}"
-
-    - name: Add Pi-Star SSH Key
-      authorized_key:
-        user: "{{ linux_user }}"
         state: present
-        key: "{{ lookup('file', '/home/pi-star/.ssh/id_rsa.pub') }}"
-      delegate_to: embyone
-
+      loop: "{{ ssh_keys + [lookup('file', '/home/pi-star/.ssh/id_rsa.pub')] }}"
+      tags: [ssh]
     - name: Add User To Sudoers
       lineinfile:
         path: /etc/sudoers
         line: "{{ linux_user }} ALL=(ALL:ALL) NOPASSWD:ALL"
         validate: 'visudo -cf %s'
-
-    # APT
+      tags: [ssh]
     - name: Update & Upgrade APT
       apt:
+        name: "{{ base_packages }}"
+        state: present
         update_cache: yes
         upgrade: dist
       register: apt_update_upgrade
-
-    # Snap
+      tags: [packages]
     - name: Update and upgrade Snap packages
       command: snap refresh
       register: snap_refresh
       changed_when: "'All snaps up to date' not in snap_refresh.stdout"
       tags: [packages]
-
-    # Packages
-    - name: Install Base Packages
-      apt:
-        name:
-          - gpustat
-          - nano
-          - ffmpeg
-          - iputils-ping
-          - btop
-          - samba
-          - transmission-daemon
-          - curl
-          - git
-          - python3-full
-          - whois
-          - traceroute
-          - gcc
-          - make
-          - python3-tzlocal
-          - python3-paramiko
-        state: present
-        update_cache: yes
-
-    # NVIDIA
-    #- name: Install NVIDIA Driver
-    #  apt:
-    #    name: "nvidia-driver-535-server"
-    #    state: present
-    #    update_cache: yes
-    #  register: nvidia_install
-
-    # Emby
     - name: Check installed Emby version
       command: dpkg -l emby-server | grep '^ii' | awk '{print $3}'
       register: emby_version_check
       changed_when: false
       failed_when: false
       tags: [emby]
-
     - name: Set Emby version fact
       set_fact:
         current_emby_version: "{{ emby_version_check.stdout | default('none') }}"
       tags: [emby]
-
     - name: Download Emby .deb
       get_url:
         url: "{{ emby_deb_url }}"
         dest: "{{ emby_deb_path }}"
       when: current_emby_version != emby_version
       tags: [emby]
-
     - name: Install or update Emby
       apt:
         deb: "{{ emby_deb_path }}"
@@ -104,36 +87,21 @@
       notify: Restart Emby
       register: emby_install
       tags: [emby]
-
-    - name: Reboot if necessary
-      reboot:
-        msg: "Rebooting system..."
-      when: apt_update.changed or snap_refresh.changed or emby_install.changed
-      tags: [reboot]
-      #nvidia_install.changed
-
-    # Reboot if necessary
-    #- name: Reboot Conditionally
-      #reboot:
-        #msg: "Rebooting system..."
-      #when: apt_update_upgrade.changed or emby_installed.rc != 0
-      #when: apt_update_upgrade.changed or  or emby_installed.rc != 0
-
-    # Bashrc
-    - name: Update BASHRC
-      lineinfile:
-        path: "/home/{{ linux_user }}/.bashrc"
-        line: "{{ item }}"
-        create: yes
-        insertafter: EOF
-      loop:
-        - 'alias ls="ls -lhAp --color=always"'
-        - 'alias ll="ls -lhAp --color=always"'
-        - 'alias update="sudo apt update -y && sudo apt full-upgrade -y && sudo apt autoremove -y"'
-        - 'alias nvtop="gpustat -a -i 1"'
-        - 'export PATH="$PATH:/home/{{ linux_user }}/.local/bin"'
-
-    # Samba
+    - name: Check if LVM device exists
+      stat:
+        path: "{{ lvm_device }}"
+      register: lvm_stat
+      failed_when: not lvm_stat.stat.exists
+      tags: [lvm]
+    - name: Edit FSTAB
+      mount:
+        path: "{{ mount_point }}"
+        src: "{{ lvm_device }}"
+        fstype: "{{ filesystem_type }}"
+        opts: defaults
+        state: mounted
+      when: lvm_stat.stat.exists
+      tags: [lvm]
     - name: Create Samba User
       user:
         name: "{{ item.username }}"
@@ -141,17 +109,22 @@
         groups: debian-transmission
         append: yes
         create_home: no
-      with_items:
-        - "{{ samba_users }}"
+      with_items: "{{ samba_users }}"
       no_log: true
-
+      tags: [samba]
+    - name: Check if Samba user exists
+      shell: "pdbedit -L | grep {{ item.username }}"
+      register: samba_user_check
+      changed_when: false
+      failed_when: false
+      with_items: "{{ samba_users }}"
+      tags: [samba, smbpasswd]
     - name: Set Samba Password
       shell: "printf '{{ item.password }}\n{{ item.password }}\n' | smbpasswd -a {{ item.username }}"
-      with_items:
-        - "{{ samba_users }}"
-      tags: smbpasswd
+      when: samba_user_check.results[ansible_loop.index].rc != 0
+      with_items: "{{ samba_users }}"
+      tags: [samba, smbpasswd]
       no_log: true
-
     - name: Set Samba Directory
       file:
         path: /mnt/data
@@ -159,7 +132,7 @@
         owner: samba
         group: samba
         mode: "2775"
-
+      tags: [samba]
     - name: Configure Samba Share
       blockinfile:
         path: /etc/samba/smb.conf
@@ -171,22 +144,13 @@
             browsable = yes
             create mask = 0777
             directory mask = 0777
-
-    # Fstab
-    - name: Edit FSTAB
-      mount:
-        path: /mnt/data
-        src: /dev/mapper/vg_data-lv_data
-        fstype: ext4
-        opts: defaults
-        state: mounted
-
-    # Transmission
+      notify: Restart Samba
+      tags: [samba]
     - name: Stop Transmission Daemon
       systemd:
         name: transmission-daemon
         state: stopped
-
+      tags: [transmission]
     - name: Update Transmission Settings
       template:
         src: transmission_settings.json
@@ -194,25 +158,27 @@
         owner: debian-transmission
         group: debian-transmission
         mode: "0644"
-
+      register: transmission_settings
+      notify: Restart Transmission
+      tags: [transmission]
     - name: Enable Transmission Daemon
       systemd:
         name: transmission-daemon
         enabled: yes
-
+      tags: [transmission]
     - name: Change Transmission Type
       lineinfile:
         path: /lib/systemd/system/transmission-daemon.service
         regexp: '^Type=notify'
         line: 'Type=simple'
         state: present
-
-    # Directories
+      notify: Restart Transmission
+      tags: [transmission]
     - name: Create a shared media group
       group:
         name: media_access
         state: present
-    
+      tags: [permissions]
     - name: Add users to media_access group
       user:
         name: "{{ item }}"
@@ -223,7 +189,7 @@
         - debian-transmission
         - avelis
         - samba
-
+      tags: [permissions]
     - name: Set Emby Directories
       file:
         path: "{{ item.path }}"
@@ -236,7 +202,7 @@
         - { path: "/var/lib/emby/metadata" }
         - { path: "/var/lib/emby/temp" }
         - { path: "/mnt/data/emby/backup" }
-
+      tags: [emby, permissions]
     - name: Set Directory Permissions
       file:
         path: "{{ item.path }}"
@@ -250,16 +216,28 @@
         - { path: "/mnt/data/Media/Movies", owner: "avelis" }
         - { path: "/mnt/data/Media/Shows", owner: "avelis" }
         - { path: "/mnt/data/Media/Sports", owner: "avelis" }
-
-    # Reboot
-    - name: Reboot
+      tags: [permissions]
+    - name: Reboot if necessary
       reboot:
         msg: "Rebooting system..."
-
+      when: apt_update_upgrade.changed or snap_refresh.changed or emby_install.changed or transmission_settings.changed
+      tags: [reboot]
   handlers:
-  - name: Restart Emby
-    systemd:
-      name: emby-server
-      state: restarted
-      enabled: yes
-    tags: [emby]
+    - name: Restart Emby
+      systemd:
+        name: emby-server
+        state: restarted
+        enabled: yes
+      tags: [emby]
+    - name: Restart Samba
+      systemd:
+        name: smbd
+        state: restarted
+        enabled: yes
+      tags: [samba]
+    - name: Restart Transmission
+      systemd:
+        name: transmission-daemon
+        state: restarted
+        enabled: yes
+      tags: [transmission]
