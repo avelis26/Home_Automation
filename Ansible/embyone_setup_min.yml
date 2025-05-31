@@ -43,15 +43,6 @@
     - name: Install Base Packages
       apt:
         name:
-          - xorg
-          - lightdm
-          - mate-desktop-environment
-          - mate-session-manager
-          - mate-control-center
-          - xserver-xorg-core
-          - xinit
-          - xserver-xorg-video-nouveau
-          - htop
           - gpustat
           - nano
           - ffmpeg
@@ -66,7 +57,6 @@
           - traceroute
           - gcc
           - make
-          - cool-retro-term
           - python3-tzlocal
           - python3-paramiko
         state: present
@@ -192,61 +182,6 @@
         regexp: '^Type=notify'
         line: 'Type=simple'
         state: present
-
-    # LightDM
-    - name: Update LightDM Config
-      copy:
-        dest: /etc/lightdm/lightdm.conf
-        content: |
-          [Seat:*]
-          autologin-user={{ linux_user }}
-          autologin-user-timeout=0
-        mode: '0644'
-
-    - name: Enable LightDM
-      systemd:
-        name: lightdm
-        enabled: yes
-
-    - name: Start LightDM
-      systemd:
-        name: lightdm
-        state: started
-
-    - name: Set Default GUI
-      command: systemctl set-default graphical.target
-
-    - name: Create Term Config Directory
-      file:
-        path: "/home/{{ linux_user }}/.config/cool-retro-term"
-        state: directory
-        owner: "{{ linux_user }}"
-        group: "{{ linux_user }}"
-        mode: '0755'
-
-    - name: Create Autostart Directory
-      file:
-        path: "/home/{{ linux_user }}/.config/autostart"
-        state: directory
-        owner: "{{ linux_user }}"
-        group: "{{ linux_user }}"
-        mode: '0755'
-
-    - name: Create Term Autostart
-      copy:
-        dest: "/home/{{ linux_user }}/.config/autostart/cool-retro-term.desktop"
-        content: |
-          [Desktop Entry]
-          Type=Application
-          Exec=bash -c 'cool-retro-term --profile Futuristic --fullscreen -e btop'
-          Hidden=false
-          NoDisplay=false
-          X-GNOME-Autostart-enabled=true
-          Name=Cool Retro Term
-          Comment=Launch cool-retro-term on desktop login
-        owner: "{{ linux_user }}"
-        group: "{{ linux_user }}"
-        mode: '0644'
 
     # Directories
     - name: Create a shared media group
