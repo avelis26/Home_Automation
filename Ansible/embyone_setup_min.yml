@@ -116,15 +116,14 @@
       no_log: true
       tags: [samba]
     - name: Check if Samba user exists
-      shell: "pdbedit -L | grep {{ item.username }}"
+      command: pdbedit -L
       register: samba_user_check
       changed_when: false
       failed_when: false
-      with_items: "{{ samba_users }}"
       tags: [samba, smbpasswd]
     - name: Set Samba Password
       shell: "printf '{{ item.password }}\n{{ item.password }}\n' | smbpasswd -a {{ item.username }}"
-      when: samba_user_check.results[ansible_loop.index].rc != 0
+      when: item.username not in samba_user_check.stdout
       with_items: "{{ samba_users }}"
       tags: [samba, smbpasswd]
       no_log: true
