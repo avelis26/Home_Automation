@@ -51,6 +51,17 @@
         line: "{{ linux_user }} ALL=(ALL:ALL) NOPASSWD:ALL"
         validate: 'visudo -cf %s'
       tags: [ssh]
+    - name: Configure auto-login for avelis on TTY1
+      copy:
+        dest: /etc/systemd/system/getty@tty1.service.d/autologin.conf
+        content: |
+          [Service]
+          ExecStart=
+          ExecStart=-/sbin/agetty --autologin avelis --noclear %I $TERM
+        owner: root
+        group: root
+        mode: '0644'
+      tags: [autologin]
     - name: Update APT cache and upgrade
       apt:
         update_cache: yes
@@ -219,6 +230,20 @@
         - { path: "/mnt/data/Media/Shows", owner: "avelis" }
         - { path: "/mnt/data/Media/Sports", owner: "avelis" }
       tags: [permissions]
+    - name: Update BASHRC for aliases and btop
+      lineinfile:
+        path: "/home/{{ linux_user }}/.bashrc"
+        line: "{{ item }}"
+        create: yes
+        insertafter: EOF
+      loop:
+        - 'alias ls="ls -lhAp --color=always"'
+        - 'alias ll="ls -lhAp --color=always"'
+        - 'alias update="sudo apt update -y && sudo apt full-upgrade -y && sudo apt autoremove -y"'
+        - 'alias nvtop="gpustat -a -i 1"'
+        - 'export PATH="$PATH:/home/{{ linux_user }}/.local/bin"'
+        - '[ -z "$SSH_CONNECTION" ] && [ -t 1 ] && btop'
+      tags: [bashrc]
     - name: Reboot if necessary
       reboot:
         msg: "Rebooting system..."
