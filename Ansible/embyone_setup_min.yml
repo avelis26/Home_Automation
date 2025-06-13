@@ -186,23 +186,13 @@
     - name: Set Emby version facts
       set_fact:
         emby_version: "{{ emby_latest_release.json.tag_name }}"
-        emby_deb_url: "https://github.com/MediaBrowser/Emby.Releases/releases/download/{{ emby_latest_release.json.tag_name }}/emby-server-deb_{{ emby_latest_release.json.tag_name }}_amd64.deb"
+        emby_deb_url: "https://github.com/MediaBrowser/Emby.Releases/releases/download/{{ emby_st_release.json.tag_name }}/emby-server-deb_{{ emby_latest_release.json.tag_name }}_amd64.deb"
         emby_deb_path: "/tmp/emby-server-deb_{{ emby_latest_release.json.tag_name }}_amd64.deb"
-      tags: [emby]
-
-    - name: Display emby_version
-      debug:
-        msg: "emby_version: {{ emby_version }}"
       tags: [emby]
 
     - name: Display emby_deb_url
       debug:
         msg: "emby_deb_url: {{ emby_deb_url }}"
-      tags: [emby]
-
-    - name: Display emby_deb_path
-      debug:
-        msg: "emby_deb_path: {{ emby_deb_path }}"
       tags: [emby]
 
     - name: Check installed Emby version
