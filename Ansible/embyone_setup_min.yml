@@ -28,26 +28,27 @@
       - python3-paramiko
       - nfs-kernel-server
   tasks:
-    - name: Get latest Emby version from GitHub API
-      uri:
-        url: https://api.github.com/repos/MediaBrowser/Emby.Releases/releases/latest
-        method: GET
-        return_content: yes
-      register: emby_latest_release
-      tags: [emby]
+    # System Setup and Package Management
+    - name: Update APT cache and upgrade
+      apt:
+        update_cache: yes
+        upgrade: dist
+      register: apt_update_upgrade
+      tags: [packages]
 
-    - name: Set Emby version facts
-      set_fact:
-        emby_version: "{{ emby_latest_release.json.tag_name }}"
-        emby_deb_url: "https://github.com/MediaBrowser/Emby.Releases/releases/download/{{ emby_latest_release.json.tag_name }}/emby-server-deb_{{ emby_latest_release.json.tag_name }}_amd64.deb"
-        emby_deb_path: "/tmp/emby-server-deb_{{ emby_latest_release.json.tag_name }}_amd64.deb"
-      tags: [emby]
+    - name: Install Base Packages
+      apt:
+        name: "{{ base_packages }}"
+        state: present
+      tags: [packages]
 
-    - name: Display detected Emby version
-      debug:
-        msg: "Latest Emby version detected: {{ emby_version }}"
-      tags: [emby]
+    - name: Update and upgrade Snap packages
+      command: snap refresh
+      register: snap_refresh
+      changed_when: "'All snaps up to date' not in snap_refresh.stdout"
+      tags: [packages]
 
+    # SSH Configuration
     - name: Create SSH Directory
       file:
         path: "/home/{{ linux_user }}/.ssh"
@@ -72,6 +73,7 @@
         validate: 'visudo -cf %s'
       tags: [ssh]
 
+    # Auto-login Configuration
     - name: Create getty service directory
       file:
         path: /etc/systemd/system/getty@tty1.service.d
@@ -93,24 +95,115 @@
         mode: '0644'
       tags: [autologin]
 
-    - name: Update APT cache and upgrade
-      apt:
-        update_cache: yes
-        upgrade: dist
-      register: apt_update_upgrade
-      tags: [packages]
+    # LVM and Storage Setup
+    - name: Check if LVM device exists
+      stat:
+        path: "{{ lvm_device }}"
+      register: lvm_stat
+      failed_when: not lvm_stat.stat.exists
+      tags: [lvm]
 
-    - name: Install Base Packages
-      apt:
-        name: "{{ base_packages }}"
+    - name: Display LVM device status
+      debug:
+        msg: "lvm_stat: {{ lvm_stat }}"
+      tags: [lvm]
+
+    - name: Edit FSTAB
+      mount:
+        path: "{{ mount_point }}"
+        src: "{{ lvm_device }}"
+        fstype: "{{ filesystem_type }}"
+        opts: defaults
+        state: mounted
+      when: lvm_stat.stat.exists
+      tags: [lvm]
+
+    # User and Group Management
+    - name: Create a shared media group
+      group:
+        name: media_access
         state: present
-      tags: [packages]
+      tags: [permissions]
 
-    - name: Update and upgrade Snap packages
-      command: snap refresh
-      register: snap_refresh
-      changed_when: "'All snaps up to date' not in snap_refresh.stdout"
-      tags: [packages]
+    - name: Add users to media_access group
+      user:
+        name: "{{ item }}"
+        groups: media_access
+        append: yes
+      loop:
+        - emby
+        - debian-transmission
+        - avelis
+        - samba
+      tags: [permissions]
+
+    - name: Add avelis to samba group
+      user:
+        name: avelis
+        groups: samba
+        append: yes
+      tags: [permissions]
+
+    # Directory Permissions Setup
+    - name: Set Directory Permissions
+      file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: media_access
+        mode: '2775'
+        recurse: yes
+      loop:
+        - { path: "/mnt/data/Torrents", owner: "debian-transmission" }
+        - { path: "/mnt/data/Media/Movies", owner: "avelis" }
+        - { path: "/mnt/data/Media/Shows", owner: "avelis" }
+        - { path: "/mnt/data/Media/Sports", owner: "avelis" }
+      tags: [permissions]
+
+    - name: Set permissions for /mnt/data excluding emby folder
+      file:
+        path: /mnt/data
+        state: directory
+        group: media_access
+        mode: g+rwX
+        recurse: yes
+      tags: [permissions]
+
+    # Emby Installation and Configuration
+    - name: Get latest Emby version from GitHub API
+      uri:
+        url: https://api.github.com/repos/MediaBrowser/Emby.Releases/releases/latest
+        method: GET
+        return_content: yes
+      register: emby_latest_release
+      tags: [emby]
+
+    - name: Display emby_latest_release
+      debug:
+        msg: "emby_latest_release: {{ emby_latest_release.json.tag_name }}"
+      tags: [emby]
+
+    - name: Set Emby version facts
+      set_fact:
+        emby_version: "{{ emby_latest_release.json.tag_name }}"
+        emby_deb_url: "https://github.com/MediaBrowser/Emby.Releases/releases/download/{{ emby_latest_release.json.tag_name }}/emby-server-deb_{{ emby_latest_release.json.tag_name }}_amd64.deb"
+        emby_deb_path: "/tmp/emby-server-deb_{{ emby_latest_release.json.tag_name }}_amd64.deb"
+      tags: [emby]
+
+    - name: Display emby_version
+      debug:
+        msg: "emby_version: {{ emby_version }}"
+      tags: [emby]
+
+    - name: Display emby_deb_url
+      debug:
+        msg: "emby_deb_url: {{ emby_deb_url }}"
+      tags: [emby]
+
+    - name: Display emby_deb_path
+      debug:
+        msg: "emby_deb_path: {{ emby_deb_path }}"
+      tags: [emby]
 
     - name: Check installed Emby version
       command: dpkg -l emby-server | grep '^ii' | awk '{print $3}'
@@ -119,19 +212,24 @@
       failed_when: false
       tags: [emby]
 
-    - name: Display current Emby version
-          debug:
-            msg: "Emby Version: {{ emby_version_check }}"
-          tags: [emby]
+    - name: Display emby_version_check
+      debug:
+        msg: "emby_version_check: {{ emby_version_check }}"
+      tags: [emby]
 
     - name: Set current Emby version fact
       set_fact:
         current_emby_version: "{{ emby_version_check.stdout | default('none') }}"
       tags: [emby]
 
-    - name: Display Emby download URL
+    - name: Display current_emby_version
       debug:
-        msg: "Emby download URL: {{ emby_deb_url }}"
+        msg: "current_emby_version: {{ current_emby_version }}"
+      tags: [emby]
+
+    - name: Display version comparison
+      debug:
+        msg: "Will {{ 'skip download - same version' if current_emby_version == emby_version else 'download and install - version mismatch' }}"
       tags: [emby]
 
     - name: Download Emby .deb
@@ -149,23 +247,37 @@
       register: emby_install
       tags: [emby]
 
-    - name: Check if LVM device exists
-      stat:
-        path: "{{ lvm_device }}"
-      register: lvm_stat
-      failed_when: not lvm_stat.stat.exists
-      tags: [lvm]
+    - name: Display emby_install
+      debug:
+        msg: "emby_install: {{ emby_install }}"
+      when: current_emby_version != emby_version
+      tags: [emby]
 
-    - name: Edit FSTAB
-      mount:
-        path: "{{ mount_point }}"
-        src: "{{ lvm_device }}"
-        fstype: "{{ filesystem_type }}"
-        opts: defaults
-        state: mounted
-      when: lvm_stat.stat.exists
-      tags: [lvm]
+    - name: Set Emby Directories
+      file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: emby
+        group: emby
+        mode: '0755'
+      loop:
+        - { path: "/mnt/data/emby" }
+        - { path: "/var/lib/emby/metadata" }
+        - { path: "/var/lib/emby/temp" }
+        - { path: "/mnt/data/emby/backup" }
+      tags: [emby, permissions]
 
+    - name: Restore emby folder permissions
+      file:
+        path: /mnt/data/emby
+        state: directory
+        owner: emby
+        group: emby
+        mode: '0755'
+        recurse: yes
+      tags: [emby, permissions]
+
+    # Samba Configuration
     - name: Create Samba User
       user:
         name: "{{ item.username }}"
@@ -182,6 +294,11 @@
       register: samba_user_check
       changed_when: false
       failed_when: false
+      tags: [samba, smbpasswd]
+
+    - name: Display samba_user_check
+      debug:
+        msg: "samba_user_check: {{ samba_user_check }}"
       tags: [samba, smbpasswd]
 
     - name: Set Samba Password
@@ -214,13 +331,7 @@
       notify: Restart Samba
       tags: [samba]
 
-    - name: Add avelis to samba group
-      user:
-        name: avelis
-        groups: samba
-        append: yes
-      tags: [permissions]
-
+    # Transmission Configuration
     - name: Stop Transmission Daemon
       systemd:
         name: transmission-daemon
@@ -253,87 +364,7 @@
       notify: Restart Transmission
       tags: [transmission]
 
-    - name: Create a shared media group
-      group:
-        name: media_access
-        state: present
-      tags: [permissions]
-
-    - name: Add users to media_access group
-      user:
-        name: "{{ item }}"
-        groups: media_access
-        append: yes
-      loop:
-        - emby
-        - debian-transmission
-        - avelis
-        - samba
-      tags: [permissions]
-
-    - name: Set Emby Directories
-      file:
-        path: "{{ item.path }}"
-        state: directory
-        owner: emby
-        group: emby
-        mode: '0755'
-      loop:
-        - { path: "/mnt/data/emby" }
-        - { path: "/var/lib/emby/metadata" }
-        - { path: "/var/lib/emby/temp" }
-        - { path: "/mnt/data/emby/backup" }
-      tags: [emby, permissions]
-
-    - name: Set Directory Permissions
-      file:
-        path: "{{ item.path }}"
-        state: directory
-        owner: "{{ item.owner }}"
-        group: media_access
-        mode: '2775'
-        recurse: yes
-      loop:
-        - { path: "/mnt/data/Torrents", owner: "debian-transmission" }
-        - { path: "/mnt/data/Media/Movies", owner: "avelis" }
-        - { path: "/mnt/data/Media/Shows", owner: "avelis" }
-        - { path: "/mnt/data/Media/Sports", owner: "avelis" }
-      tags: [permissions]
-
-    - name: Set permissions for /mnt/data excluding emby folder
-      file:
-        path: /mnt/data
-        state: directory
-        group: media_access
-        mode: g+rwX
-        recurse: yes
-      tags: [permissions]
-
-    - name: Restore emby folder permissions
-      file:
-        path: /mnt/data/emby
-        state: directory
-        owner: emby
-        group: emby
-        mode: '0755'
-        recurse: yes
-      tags: [permissions]
-
-    - name: Update BASHRC for aliases and btop
-      lineinfile:
-        path: "/home/{{ linux_user }}/.bashrc"
-        line: "{{ item }}"
-        create: yes
-        insertafter: EOF
-      loop:
-        - 'alias ls="ls -lhAp --color=always"'
-        - 'alias ll="ls -lhAp --color=always"'
-        - 'alias update="sudo apt update -y && sudo apt full-upgrade -y && sudo apt autoremove -y"'
-        - 'alias nvtop="gpustat -a -i 1"'
-        - 'export PATH="$PATH:/home/{{ linux_user }}/.local/bin"'
-        - '[ -z "$SSH_CONNECTION" ] && [ -t 1 ] && btop'
-      tags: [bashrc]
-
+    # NFS Configuration
     - name: Configure NFS exports
       lineinfile:
         path: /etc/exports
@@ -349,11 +380,29 @@
         enabled: yes
       tags: [nfs]
 
+    # Shell Configuration
+    - name: Update BASHRC for aliases and btop
+      lineinfile:
+        path: "/home/{{ linux_user }}/.bashrc"
+        line: "{{ item }}"
+        create: yes
+        insertafter: EOF
+      loop:
+        - 'alias ls="ls -lhAp --color=always"'
+        - 'alias ll="ls -lhAp --color=always"'
+        - 'alias update="sudo apt update -y && sudo apt full-upgrade -y && sudo apt autoremove -y"'
+        - 'alias nvtop="gpustat -a -i 1"'
+        - 'export PATH="$PATH:/home/{{ linux_user }}/.local/bin"'
+        - '[ -z "$SSH_CONNECTION" ] && [ -t 1 ] && btop'
+      tags: [bashrc]
+
+    # System Reboot if Necessary
     - name: Reboot if necessary
       reboot:
         msg: "Rebooting system..."
       when: apt_update_upgrade.changed or snap_refresh.changed or emby_install.changed or transmission_settings.changed
       tags: [reboot]
+
   handlers:
     - name: Restart Emby
       systemd:
