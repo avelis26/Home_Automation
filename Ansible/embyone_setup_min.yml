@@ -168,6 +168,12 @@
             directory mask = 0777
       notify: Restart Samba
       tags: [samba]
+    - name: Add avelis to samba group
+      user:
+        name: avelis
+        groups: samba
+        append: yes
+      tags: [permissions]
     - name: Stop Transmission Daemon
       systemd:
         name: transmission-daemon
@@ -238,6 +244,23 @@
         - { path: "/mnt/data/Media/Movies", owner: "avelis" }
         - { path: "/mnt/data/Media/Shows", owner: "avelis" }
         - { path: "/mnt/data/Media/Sports", owner: "avelis" }
+      tags: [permissions]
+    - name: Set permissions for /mnt/data excluding emby folder
+      file:
+        path: /mnt/data
+        state: directory
+        group: media_access
+        mode: g+rwX
+        recurse: yes
+      tags: [permissions]
+    - name: Restore emby folder permissions
+      file:
+        path: /mnt/data/emby
+        state: directory
+        owner: emby
+        group: emby
+        mode: '0755'
+        recurse: yes
       tags: [permissions]
     - name: Update BASHRC for aliases and btop
       lineinfile:
