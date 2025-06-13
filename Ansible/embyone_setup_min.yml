@@ -276,6 +276,25 @@
         - 'export PATH="$PATH:/home/{{ linux_user }}/.local/bin"'
         - '[ -z "$SSH_CONNECTION" ] && [ -t 1 ] && btop'
       tags: [bashrc]
+    - name: Configure NFS exports
+      lineinfile:
+        path: /etc/exports
+        line: "/mnt/data 192.168.50.0/24(rw,sync,no_subtree_check)"
+        create: yes
+      notify: Restart NFS
+      tags: [nfs]
+    - name: Ensure NFS is running
+      systemd:
+        name: nfs-kernel-server
+        state: started
+        enabled: yes
+      tags: [nfs]
+    handlers:
+      - name: Restart NFS
+        systemd:
+          name: nfs-kernel-server
+          state: restarted
+        tags: [nfs]
     - name: Reboot if necessary
       reboot:
         msg: "Rebooting system..."
