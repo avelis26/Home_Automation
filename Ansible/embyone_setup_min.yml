@@ -196,7 +196,7 @@
       tags: [emby]
 
     - name: Check installed Emby version
-      command: dpkg -l emby-server | grep '^ii' | awk '{print $3}'
+      command: dpkg-query -W -f='${Version}' emby-server
       register: emby_version_check
       changed_when: false
       failed_when: false
