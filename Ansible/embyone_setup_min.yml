@@ -56,6 +56,7 @@
         group: "{{ linux_user }}"
         mode: '0700'
       tags: [ssh]
+
     - name: Add SSH keys
       authorized_key:
         user: "{{ linux_user }}"
@@ -63,12 +64,14 @@
         state: present
       loop: "{{ ssh_keys + [lookup('file', '/home/pi-star/.ssh/id_rsa.pub')] }}"
       tags: [ssh]
+
     - name: Add User To Sudoers
       lineinfile:
         path: /etc/sudoers
         line: "{{ linux_user }} ALL=(ALL:ALL) NOPASSWD:ALL"
         validate: 'visudo -cf %s'
       tags: [ssh]
+
     - name: Create getty service directory
       file:
         path: /etc/systemd/system/getty@tty1.service.d
@@ -77,6 +80,7 @@
         group: root
         mode: '0755'
       tags: [autologin]
+
     - name: Configure auto-login for avelis on TTY1
       copy:
         dest: /etc/systemd/system/getty@tty1.service.d/autologin.conf
@@ -88,38 +92,45 @@
         group: root
         mode: '0644'
       tags: [autologin]
+
     - name: Update APT cache and upgrade
       apt:
         update_cache: yes
         upgrade: dist
       register: apt_update_upgrade
       tags: [packages]
+
     - name: Install Base Packages
       apt:
         name: "{{ base_packages }}"
         state: present
       tags: [packages]
+
     - name: Update and upgrade Snap packages
       command: snap refresh
       register: snap_refresh
       changed_when: "'All snaps up to date' not in snap_refresh.stdout"
       tags: [packages]
+
     - name: Check installed Emby version
       command: dpkg -l emby-server | grep '^ii' | awk '{print $3}'
       register: emby_version_check
       changed_when: false
       failed_when: false
       tags: [emby]
+
     - name: Set current Emby version fact
       set_fact:
         current_emby_version: "{{ emby_version_check.stdout | default('none') }}"
       tags: [emby]
+
     - name: Download Emby .deb
       get_url:
         url: "{{ emby_deb_url }}"
         dest: "{{ emby_deb_path }}"
       when: current_emby_version != emby_version
       tags: [emby]
+
     - name: Install or update Emby
       apt:
         deb: "{{ emby_deb_path }}"
@@ -127,12 +138,14 @@
       notify: Restart Emby
       register: emby_install
       tags: [emby]
+
     - name: Check if LVM device exists
       stat:
         path: "{{ lvm_device }}"
       register: lvm_stat
       failed_when: not lvm_stat.stat.exists
       tags: [lvm]
+
     - name: Edit FSTAB
       mount:
         path: "{{ mount_point }}"
@@ -142,6 +155,7 @@
         state: mounted
       when: lvm_stat.stat.exists
       tags: [lvm]
+
     - name: Create Samba User
       user:
         name: "{{ item.username }}"
@@ -152,18 +166,21 @@
       with_items: "{{ samba_users }}"
       no_log: true
       tags: [samba]
+
     - name: Check if Samba user exists
       command: pdbedit -L
       register: samba_user_check
       changed_when: false
       failed_when: false
       tags: [samba, smbpasswd]
+
     - name: Set Samba Password
       shell: "printf '{{ item.password }}\n{{ item.password }}\n' | smbpasswd -a {{ item.username }}"
       when: item.username not in samba_user_check.stdout
       with_items: "{{ samba_users }}"
       tags: [samba, smbpasswd]
       no_log: true
+
     - name: Set Samba Directory
       file:
         path: /mnt/data
@@ -172,6 +189,7 @@
         group: samba
         mode: "2775"
       tags: [samba]
+
     - name: Configure Samba Share
       blockinfile:
         path: /etc/samba/smb.conf
@@ -185,17 +203,20 @@
             directory mask = 0777
       notify: Restart Samba
       tags: [samba]
+
     - name: Add avelis to samba group
       user:
         name: avelis
         groups: samba
         append: yes
       tags: [permissions]
+
     - name: Stop Transmission Daemon
       systemd:
         name: transmission-daemon
         state: stopped
       tags: [transmission]
+
     - name: Update Transmission Settings
       template:
         src: transmission_settings.json
@@ -206,11 +227,13 @@
       register: transmission_settings
       notify: Restart Transmission
       tags: [transmission]
+
     - name: Enable Transmission Daemon
       systemd:
         name: transmission-daemon
         enabled: yes
       tags: [transmission]
+
     - name: Change Transmission Type
       lineinfile:
         path: /lib/systemd/system/transmission-daemon.service
@@ -219,11 +242,13 @@
         state: present
       notify: Restart Transmission
       tags: [transmission]
+
     - name: Create a shared media group
       group:
         name: media_access
         state: present
       tags: [permissions]
+
     - name: Add users to media_access group
       user:
         name: "{{ item }}"
@@ -235,6 +260,7 @@
         - avelis
         - samba
       tags: [permissions]
+
     - name: Set Emby Directories
       file:
         path: "{{ item.path }}"
@@ -248,6 +274,7 @@
         - { path: "/var/lib/emby/temp" }
         - { path: "/mnt/data/emby/backup" }
       tags: [emby, permissions]
+
     - name: Set Directory Permissions
       file:
         path: "{{ item.path }}"
@@ -262,6 +289,7 @@
         - { path: "/mnt/data/Media/Shows", owner: "avelis" }
         - { path: "/mnt/data/Media/Sports", owner: "avelis" }
       tags: [permissions]
+
     - name: Set permissions for /mnt/data excluding emby folder
       file:
         path: /mnt/data
@@ -270,6 +298,7 @@
         mode: g+rwX
         recurse: yes
       tags: [permissions]
+
     - name: Restore emby folder permissions
       file:
         path: /mnt/data/emby
@@ -279,6 +308,7 @@
         mode: '0755'
         recurse: yes
       tags: [permissions]
+
     - name: Update BASHRC for aliases and btop
       lineinfile:
         path: "/home/{{ linux_user }}/.bashrc"
@@ -293,6 +323,7 @@
         - 'export PATH="$PATH:/home/{{ linux_user }}/.local/bin"'
         - '[ -z "$SSH_CONNECTION" ] && [ -t 1 ] && btop'
       tags: [bashrc]
+
     - name: Configure NFS exports
       lineinfile:
         path: /etc/exports
@@ -300,12 +331,14 @@
         create: yes
       notify: Restart NFS
       tags: [nfs]
+
     - name: Ensure NFS is running
       systemd:
         name: nfs-kernel-server
         state: started
         enabled: yes
       tags: [nfs]
+
     - name: Reboot if necessary
       reboot:
         msg: "Rebooting system..."
@@ -318,18 +351,21 @@
         state: restarted
         enabled: yes
       tags: [emby]
+
     - name: Restart Samba
       systemd:
         name: smbd
         state: restarted
         enabled: yes
       tags: [samba]
+
     - name: Restart Transmission
       systemd:
         name: transmission-daemon
         state: restarted
         enabled: yes
       tags: [transmission]
+
     - name: Restart NFS
       systemd:
         name: nfs-kernel-server
