@@ -29,6 +29,7 @@
       - make
       - python3-tzlocal
       - python3-paramiko
+      - nfs-kernel-server
   tasks:
     - name: Create SSH Directory
       file:
