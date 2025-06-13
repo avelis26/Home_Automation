@@ -6,9 +6,6 @@
   vars_files:
     - secrets_one.yml
   vars:
-    emby_version: 4.8.9.0
-    emby_deb_url: "https://github.com/MediaBrowser/Emby.Releases/releases/download/{{ emby_version }}/emby-server-deb_{{ emby_version }}_amd64.deb"
-    emby_deb_path: "/tmp/emby-server-deb_{{ emby_version }}_amd64.deb"
     mount_point: /mnt/data
     lvm_device: /dev/mapper/vg_data-lv_data
     filesystem_type: ext4
@@ -31,6 +28,26 @@
       - python3-paramiko
       - nfs-kernel-server
   tasks:
+    - name: Get latest Emby version from GitHub API
+      uri:
+        url: https://api.github.com/repos/MediaBrowser/Emby.Releases/releases/latest
+        method: GET
+        return_content: yes
+      register: emby_latest_release
+      tags: [emby]
+
+    - name: Set Emby version facts
+      set_fact:
+        emby_version: "{{ emby_latest_release.json.tag_name }}"
+        emby_deb_url: "https://github.com/MediaBrowser/Emby.Releases/releases/download/{{ emby_latest_release.json.tag_name }}/emby-server-deb_{{ emby_latest_release.json.tag_name }}_amd64.deb"
+        emby_deb_path: "/tmp/emby-server-deb_{{ emby_latest_release.json.tag_name }}_amd64.deb"
+      tags: [emby]
+
+    - name: Display detected Emby version
+      debug:
+        msg: "Latest Emby version detected: {{ emby_version }}"
+      tags: [emby]
+
     - name: Create SSH Directory
       file:
         path: "/home/{{ linux_user }}/.ssh"
@@ -93,7 +110,7 @@
       changed_when: false
       failed_when: false
       tags: [emby]
-    - name: Set Emby version fact
+    - name: Set current Emby version fact
       set_fact:
         current_emby_version: "{{ emby_version_check.stdout | default('none') }}"
       tags: [emby]
