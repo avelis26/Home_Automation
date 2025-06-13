@@ -103,11 +103,6 @@
       failed_when: not lvm_stat.stat.exists
       tags: [lvm]
 
-    - name: Display LVM device status
-      debug:
-        msg: "lvm_stat: {{ lvm_stat }}"
-      tags: [lvm]
-
     - name: Edit FSTAB
       mount:
         path: "{{ mount_point }}"
