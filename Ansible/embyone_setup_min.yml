@@ -289,12 +289,6 @@
         state: started
         enabled: yes
       tags: [nfs]
-    handlers:
-      - name: Restart NFS
-        systemd:
-          name: nfs-kernel-server
-          state: restarted
-        tags: [nfs]
     - name: Reboot if necessary
       reboot:
         msg: "Rebooting system..."
@@ -319,3 +313,8 @@
         state: restarted
         enabled: yes
       tags: [transmission]
+    - name: Restart NFS
+      systemd:
+        name: nfs-kernel-server
+        state: restarted
+      tags: [nfs]
