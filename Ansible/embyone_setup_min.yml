@@ -119,6 +119,11 @@
       failed_when: false
       tags: [emby]
 
+    - name: Display current Emby version
+          debug:
+            msg: "Emby Version: {{ emby_version_check }}"
+          tags: [emby]
+
     - name: Set current Emby version fact
       set_fact:
         current_emby_version: "{{ emby_version_check.stdout | default('none') }}"
