@@ -124,6 +124,11 @@
         current_emby_version: "{{ emby_version_check.stdout | default('none') }}"
       tags: [emby]
 
+    - name: Display Emby download URL
+      debug:
+        msg: "Emby download URL: {{ emby_deb_url }}"
+      tags: [emby]
+
     - name: Download Emby .deb
       get_url:
         url: "{{ emby_deb_url }}"
