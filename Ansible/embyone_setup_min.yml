@@ -25,6 +25,8 @@
       - gcc
       - make
       - python3-tzlocal
+      - python3-psutil
+      - python3-pip
       - python3-paramiko
       - nfs-kernel-server
   tasks:
@@ -165,6 +167,15 @@
       tags: [permissions]
 
     # Emby Installation and Configuration
+    - name: Create Emby Sync Cron Job
+      ansible.builtin.cron:
+        name: "Emby Sync"
+        minute: "*/5"
+        job: "/usr/bin/python3 /home/avelis/source/Home_Automation/embysync.py >/dev/null 2>&1"
+        user: avelis
+        state: present
+      #become: yes
+
     - name: Get latest Emby version from GitHub API
       uri:
         url: https://api.github.com/repos/MediaBrowser/Emby.Releases/releases/latest
