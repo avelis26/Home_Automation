@@ -100,6 +100,14 @@
         deb: /tmp/emby-server-deb_4.8.9.0_amd64.deb
       when: emby_installed.rc != 0
 
+    - name: Ensure Emby sync cron job is present
+      ansible.builtin.cron:
+        name: "Emby media sync between embyone and embytwo"
+        minute: "*/30"
+        job: "/usr/bin/python3 /home/avelis/source/Home_Automation/embysync.py >/dev/null 2>&1"
+        user: avelis
+        state: present
+
     # Reboot if necessary
     #- name: Reboot Conditionally
       #reboot:
