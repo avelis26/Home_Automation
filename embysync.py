@@ -23,7 +23,7 @@ class EmbySync:
         
         # Sleep hours (24-hour format)
         self.sleep_start = 1 # 1 AM
-        self.sleep_end = 6 # 6 AM
+        self.sleep_end = 7 # 7 AM
         
         # Setup logging
         logging.basicConfig(
@@ -39,13 +39,7 @@ class EmbySync:
     def is_sleep_time(self):
         """Check if current time is within sleep hours"""
         current_hour = datetime.now().hour
-        
-        if self.sleep_start > self.sleep_end:
-            # Sleep time crosses midnight (e.g., 01:00 to 06:00)
-            return current_hour >= self.sleep_start or current_hour < self.sleep_end
-        else:
-            # Sleep time within same day
-            return self.sleep_start <= current_hour < self.sleep_end
+        return self.sleep_start <= current_hour < self.sleep_end
 
     def check_lock(self):
         """Check for existing lock file and running process"""
@@ -150,7 +144,7 @@ class EmbySync:
             
             # Check if it's sleep time
             if not self.is_sleep_time():
-                self.logger.info(f"Not in sleep hours ({self.sleep_start}:00 - {self.sleep_end}:00). Exiting.")
+                self.logger.info(f"Not in sleep hours ({self.sleep_start}:00 - {self.sleep_end-1}:59). Exiting.")
                 return
             
             # Check for running instance
