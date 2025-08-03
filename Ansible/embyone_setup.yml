@@ -100,7 +100,7 @@
         deb: /tmp/emby-server-deb_4.8.9.0_amd64.deb
       when: emby_installed.rc != 0
 
-    - name: Ensure Emby sync cron job is present
+    - name: Create Emby Sync Cron Job
       ansible.builtin.cron:
         name: "Emby Sync"
         minute: "*/5"
