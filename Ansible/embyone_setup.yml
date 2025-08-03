@@ -107,7 +107,7 @@
         job: "/usr/bin/python3 /home/avelis/source/Home_Automation/embysync.py >/dev/null 2>&1"
         user: avelis
         state: present
-      become: yes
+      #become: yes
 
     # Reboot if necessary
     #- name: Reboot Conditionally
