@@ -1,2 +1,2 @@
 # Run every 30 minutes during sleep hours
-*/30 23-23,0-6 * * * /usr/bin/python3 /path/to/emby-sync.py >/dev/null 2>&1
+*/30 23-23,0-6 * * * /usr/bin/python3 /home/avelis/source/Home_Automation/embysync.py >/dev/null 2>&1
