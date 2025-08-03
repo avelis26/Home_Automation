@@ -62,13 +62,14 @@
           - curl
           - git
           - python3-full
+          - python3-tzlocal
+          - python3-paramiko
+          - python3-pip
           - whois
           - traceroute
           - gcc
           - make
           - cool-retro-term
-          - python3-tzlocal
-          - python3-paramiko
         state: present
         update_cache: yes
 
