@@ -133,7 +133,7 @@ class EmbySync:
             '--progress',
             '--partial',
             '--checksum',
-            '--update',
+            '--delete',
             f'--bwlimit={self.bandwidth_limit}',
             '--stats',
             f'--exclude-from={self.exclude_file}',
