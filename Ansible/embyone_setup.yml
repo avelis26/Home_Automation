@@ -102,11 +102,12 @@
 
     - name: Ensure Emby sync cron job is present
       ansible.builtin.cron:
-        name: "Emby media sync between embyone and embytwo"
-        minute: "*/30"
+        name: "Emby Sync"
+        minute: "*/5"
         job: "/usr/bin/python3 /home/avelis/source/Home_Automation/embysync.py >/dev/null 2>&1"
         user: avelis
         state: present
+      become: yes
 
     # Reboot if necessary
     #- name: Reboot Conditionally
