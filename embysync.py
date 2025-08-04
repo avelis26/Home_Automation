@@ -12,10 +12,10 @@ from pathlib import Path
 class EmbySync:
     def __init__(self):
         # Configuration
-        self.source_path = "/mnt/data/Media/tmp"
+        self.source_path = "/mnt/data/Media"
         self.dest_user = "grace"
         self.dest_host = "embytwo"
-        self.dest_path = "/mnt/data/Media/tmp"
+        self.dest_path = "/mnt/data/Media"
         self.log_file = "/var/log/emby-sync.log"
         self.lock_file = "/tmp/emby-sync.lock"
         self.exclude_file = "/tmp/emby-sync-exclude.txt"
@@ -24,7 +24,7 @@ class EmbySync:
         
         # Sleep hours (24-hour format)
         self.sleep_start = 0
-        self.sleep_end = 24
+        self.sleep_end = 8
         
         # Files/patterns to exclude (embytwo-only content)
         # Add your show names here - supports wildcards
