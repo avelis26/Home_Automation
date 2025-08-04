@@ -186,7 +186,7 @@
         minute: "0"
         hour: "2"
         weekday: "0"
-        job: "/usr/local/bin/rotate-emby-log.sh"
+        job: "/home/avelis/source/Home_Automation/rotate-emby-log.sh"
         user: avelis
         state: present
 
