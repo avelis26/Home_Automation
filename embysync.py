@@ -11,8 +11,12 @@ from pathlib import Path
 
 class EmbySync:
     def __init__(self):
-        # Configuration
-        self.source_path = "/mnt/data/Media"
+        # Configuration - now supports multiple source paths
+        self.source_paths = [
+            "/mnt/data/Media/Movies",
+            "/mnt/data/Media/Shows"
+            # Add more paths as needed
+        ]
         self.dest_user = "grace"
         self.dest_host = "embytwo"
         self.dest_path = "/mnt/data/Media"
@@ -44,6 +48,23 @@ class EmbySync:
             ]
         )
         self.logger = logging.getLogger(__name__)
+
+    def validate_source_paths(self):
+        """Validate that all source paths exist"""
+        valid_paths = []
+        for path in self.source_paths:
+            if os.path.exists(path):
+                valid_paths.append(path)
+                self.logger.info(f"Source path validated: {path}")
+            else:
+                self.logger.warning(f"Source path does not exist: {path}")
+        
+        if not valid_paths:
+            self.logger.error("No valid source paths found")
+            return False
+        
+        self.source_paths = valid_paths
+        return True
 
     def create_exclude_file(self):
         """Create exclusion file for rsync"""
@@ -128,9 +149,12 @@ class EmbySync:
             self.logger.error(f"SSH test failed: {e}")
             return False
 
-    def sync_files(self):
-        """Perform rsync with time and date comparison and exclusions"""
+    def sync_single_path(self, source_path):
+        """Perform rsync for a single source path"""
         destination = f"{self.dest_user}@{self.dest_host}:{self.dest_path}/"
+        
+        # Get the relative path structure to maintain directory hierarchy
+        source_name = os.path.basename(source_path)
         
         cmd = [
             'rsync',
@@ -141,27 +165,26 @@ class EmbySync:
             f'--bwlimit={self.bandwidth_limit}',
             '--stats',
             f'--exclude-from={self.exclude_file}',
-            f'{self.source_path}/',
-            destination
+            f'{source_path}/',
+            f'{destination}{source_name}/'
         ]
         
         for attempt in range(1, self.max_retries + 1):
-            self.logger.info(f"Sync attempt {attempt} of {self.max_retries}")
-            self.logger.warning("Using fast time and date for comparison")
+            self.logger.info(f"Syncing {source_path} - attempt {attempt} of {self.max_retries}")
             
             try:
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 
                 if result.returncode == 0:
-                    self.logger.info("Sync completed successfully")
+                    self.logger.info(f"Sync completed successfully for {source_path}")
                     if "Number of files:" in result.stdout:
                         stats_lines = [line for line in result.stdout.split('\n') if 'Number of' in line or 'Total file size:' in line or 'sent' in line]
                         for line in stats_lines:
                             if line.strip():
-                                self.logger.info(f"Stats: {line.strip()}")
+                                self.logger.info(f"Stats for {source_name}: {line.strip()}")
                     return True
                 else:
-                    self.logger.error(f"Sync attempt {attempt} failed (exit code: {result.returncode})")
+                    self.logger.error(f"Sync attempt {attempt} failed for {source_path} (exit code: {result.returncode})")
                     self.logger.error(f"Error output: {result.stderr}")
                     
                     if attempt < self.max_retries:
@@ -169,12 +192,33 @@ class EmbySync:
                         time.sleep(60)
                         
             except Exception as e:
-                self.logger.error(f"Sync attempt {attempt} failed with exception: {e}")
+                self.logger.error(f"Sync attempt {attempt} failed for {source_path} with exception: {e}")
                 if attempt < self.max_retries:
                     time.sleep(60)
         
-        self.logger.error(f"All sync attempts failed after {self.max_retries} tries")
+        self.logger.error(f"All sync attempts failed for {source_path} after {self.max_retries} tries")
         return False
+
+    def sync_files(self):
+        """Perform rsync for all source paths"""
+        self.logger.info("Using fast time and date for comparison")
+        
+        all_successful = True
+        successful_syncs = 0
+        
+        for source_path in self.source_paths:
+            self.logger.info(f"Starting sync for: {source_path}")
+            success = self.sync_single_path(source_path)
+            
+            if success:
+                successful_syncs += 1
+                self.logger.info(f"Successfully synced: {source_path}")
+            else:
+                all_successful = False
+                self.logger.error(f"Failed to sync: {source_path}")
+        
+        self.logger.info(f"Sync summary: {successful_syncs}/{len(self.source_paths)} paths synced successfully")
+        return all_successful
 
     def run(self):
         """Main execution method"""
@@ -184,6 +228,11 @@ class EmbySync:
             # Check if it's sleep time
             if not self.is_sleep_time():
                 self.logger.info(f"Not in sleep hours ({self.sleep_start}:00 - {self.sleep_end-1}:59). Exiting.")
+                return
+            
+            # Validate source paths
+            if not self.validate_source_paths():
+                self.logger.error("No valid source paths found. Exiting.")
                 return
             
             # Check for running instance
@@ -203,15 +252,19 @@ class EmbySync:
                 return
             
             # Start sync
-            self.logger.info(f"Starting media sync from {self.source_path} to {self.dest_user}@{self.dest_host}:{self.dest_path}")
+            self.logger.info(f"Starting media sync from {len(self.source_paths)} source paths to {self.dest_user}@{self.dest_host}:{self.dest_path}")
+            for path in self.source_paths:
+                self.logger.info(f"  - {path}")
+            
             if self.exclusions:
                 self.logger.info(f"Excluding {len(self.exclusions)} patterns from sync")
+            
             success = self.sync_files()
             
             if success:
-                self.logger.info("Media sync completed successfully")
+                self.logger.info("All media sync operations completed successfully")
             else:
-                self.logger.error("Media sync failed")
+                self.logger.warning("Some media sync operations failed - check logs for details")
                 
         except KeyboardInterrupt:
             self.logger.info("Sync interrupted by user")
