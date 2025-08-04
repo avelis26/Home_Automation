@@ -65,14 +65,14 @@ class EmbySync:
             pass
 
     def is_sleep_time(self):
-    """Check if current time is within sleep hours"""
-    current_hour = datetime.now().hour
-    
-    # Handle overnight period (sleep_start > sleep_end means crossing midnight)
-    if self.sleep_start > self.sleep_end:
-        return current_hour >= self.sleep_start or current_hour < self.sleep_end
-    else:
-        return self.sleep_start <= current_hour < self.sleep_end
+        """Check if current time is within sleep hours"""
+        current_hour = datetime.now().hour
+        
+        # Handle overnight period (sleep_start > sleep_end means crossing midnight)
+        if self.sleep_start > self.sleep_end:
+            return current_hour >= self.sleep_start or current_hour < self.sleep_end
+        else:
+            return self.sleep_start <= current_hour < self.sleep_end
 
     def check_lock(self):
         """Check for existing lock file and running process"""
