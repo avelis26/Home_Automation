@@ -40,7 +40,7 @@ class EmbySync:
         
         # Setup logging
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.DEBUG,
             format='%(asctime)s - %(levelname)s - %(message)s',
             handlers=[
                 logging.FileHandler(self.log_file),
@@ -150,7 +150,7 @@ class EmbySync:
             return False
 
     def sync_single_path(self, source_path):
-        """Perform rsync for a single source path"""
+        """Perform rsync for a single source path with real-time output"""
         destination = f"{self.dest_user}@{self.dest_host}:{self.dest_path}/"
         
         # Get the relative path structure to maintain directory hierarchy
@@ -173,19 +173,71 @@ class EmbySync:
             self.logger.info(f"Syncing {source_path} - attempt {attempt} of {self.max_retries}")
             
             try:
-                result = subprocess.run(cmd, capture_output=True, text=True)
+                # Use Popen for real-time output streaming
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    bufsize=1,
+                    universal_newlines=True
+                )
                 
-                if result.returncode == 0:
+                stdout_lines = []
+                stderr_lines = []
+                
+                # Read output line by line in real-time
+                while True:
+                    output = process.stdout.readline()
+                    if output == '' and process.poll() is not None:
+                        break
+                    if output:
+                        line = output.strip()
+                        stdout_lines.append(line)
+                        
+                        # Log file transfers and progress
+                        if line and not line.startswith('receiving') and not line.startswith('sent '):
+                            # Skip empty lines and certain progress indicators
+                            if (line.endswith('.mkv') or line.endswith('.mp4') or 
+                                line.endswith('.avi') or line.endswith('.mov') or
+                                line.endswith('.wmv') or line.endswith('.flv') or
+                                line.endswith('.webm') or line.endswith('.m4v') or
+                                line.endswith('.mpg') or line.endswith('.mpeg') or
+                                '/' in line):
+                                # This looks like a file being transferred
+                                if not any(skip in line.lower() for skip in ['building file list', 'total size', 'speedup']):
+                                    self.logger.info(f"Transferring: {line}")
+                            elif 'to-chk=' in line or 'to-check=' in line:
+                                # Progress indicator
+                                self.logger.info(f"Progress: {line}")
+                
+                # Read any remaining stderr
+                stderr_output = process.stderr.read()
+                if stderr_output:
+                    stderr_lines.extend(stderr_output.strip().split('\n'))
+                
+                # Wait for process to complete
+                return_code = process.wait()
+                
+                if return_code == 0:
                     self.logger.info(f"Sync completed successfully for {source_path}")
-                    if "Number of files:" in result.stdout:
-                        stats_lines = [line for line in result.stdout.split('\n') if 'Number of' in line or 'Total file size:' in line or 'sent' in line]
-                        for line in stats_lines:
+                    
+                    # Log statistics from stdout
+                    stats_found = False
+                    for line in stdout_lines:
+                        if ('Number of files:' in line or 'Total file size:' in line or 
+                            'sent ' in line or 'total size is' in line):
                             if line.strip():
                                 self.logger.info(f"Stats for {source_name}: {line.strip()}")
+                                stats_found = True
+                    
                     return True
                 else:
-                    self.logger.error(f"Sync attempt {attempt} failed for {source_path} (exit code: {result.returncode})")
-                    self.logger.error(f"Error output: {result.stderr}")
+                    self.logger.error(f"Sync attempt {attempt} failed for {source_path} (exit code: {return_code})")
+                    if stderr_lines:
+                        for error_line in stderr_lines:
+                            if error_line.strip():
+                                self.logger.error(f"Error: {error_line.strip()}")
                     
                     if attempt < self.max_retries:
                         self.logger.info("Waiting 60 seconds before retry...")
@@ -201,7 +253,8 @@ class EmbySync:
 
     def sync_files(self):
         """Perform rsync for all source paths"""
-        self.logger.info("Using fast time and date for comparison")
+        self.logger.info("Using time and date for fast comparison...")
+        self.logger.debug("Consider using checksum for more accurate comparisons")
         
         all_successful = True
         successful_syncs = 0
