@@ -172,13 +172,13 @@
       tags: [permissions]
 
     # Emby Installation and Configuration
-    - name: Create Emby Sync Cron Job
-      ansible.builtin.cron:
-        name: "Emby Sync"
-        minute: "*/60"
-        job: "/usr/bin/python3 /home/avelis/source/Home_Automation/embysync.py >/dev/null 2>&1"
-        user: avelis
-        state: present
+    #- name: Create Emby Sync Cron Job
+    #  ansible.builtin.cron:
+    #    name: "Emby Sync"
+    #    minute: "*/60"
+    #    job: "/usr/bin/python3 /home/avelis/source/Home_Automation/embysync.py >/dev/null 2>&1"
+    #    user: avelis
+    #    state: present
 
     - name: Get latest Emby version from GitHub API
       uri:
