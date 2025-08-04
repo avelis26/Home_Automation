@@ -170,7 +170,7 @@
     - name: Create Emby Sync Cron Job
       ansible.builtin.cron:
         name: "Emby Sync"
-        minute: "*/5"
+        minute: "*/60"
         job: "/usr/bin/python3 /home/avelis/source/Home_Automation/embysync.py >/dev/null 2>&1"
         user: avelis
         state: present
