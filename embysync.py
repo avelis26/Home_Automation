@@ -132,7 +132,6 @@ class EmbySync:
             '-avzh',
             '--progress',
             '--partial',
-            '--checksum',
             '--delete',
             f'--bwlimit={self.bandwidth_limit}',
             '--stats',
@@ -143,7 +142,7 @@ class EmbySync:
         
         for attempt in range(1, self.max_retries + 1):
             self.logger.info(f"Sync attempt {attempt} of {self.max_retries}")
-            self.logger.info("Using checksum comparison (this may take longer for initial scan)")
+            self.logger.warning("Using fast time and date for comparison")
             
             try:
                 result = subprocess.run(cmd, capture_output=True, text=True)
