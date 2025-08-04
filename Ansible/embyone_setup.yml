@@ -19,11 +19,12 @@
       - transmission-daemon
       - curl
       - git
-      - python3-full
       - whois
       - traceroute
       - gcc
       - make
+      - ccze
+      - python3-full
       - python3-tzlocal
       - python3-psutil
       - python3-pip
@@ -386,7 +387,7 @@
         - 'alias ls="ls -lhAp --color=always"'
         - 'alias ll="ls -lhAp --color=always"'
         - 'alias update="sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y && sudo snap refresh"'
-        - 'alias embysynclog="tail -f /var/log/emby-sync.log | grep --color=always -E "(ERROR|WARNING|INFO|DEBUG|.*)"'
+        - 'alias embysynclog="tail -f /var/log/emby-sync.log | ccze -A"'
         - 'alias nvtop="gpustat -a -i 1"'
         - 'export PATH="$PATH:/home/{{ linux_user }}/.local/bin"'
         - '[ -z "$SSH_CONNECTION" ] && [ -t 1 ] && btop'
