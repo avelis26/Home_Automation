@@ -23,7 +23,6 @@
       - traceroute
       - gcc
       - make
-      - ccze
       - python3-full
       - python3-tzlocal
       - python3-psutil
@@ -387,7 +386,7 @@
         - 'alias ls="ls -lhAp --color=always"'
         - 'alias ll="ls -lhAp --color=always"'
         - 'alias update="sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y && sudo snap refresh"'
-        - 'alias embysynclog="tail -f /var/log/emby-sync.log | ccze -A"'
+        - 'alias embysynclog="tail -f /var/log/emby-sync.log | sed -e ''s/.*ERROR.*/\x1b[31m&\x1b[0m/'' -e ''s/.*WARNING.*/\x1b[33m&\x1b[0m/'' -e ''s/.*INFO.*/\x1b[32m&\x1b[0m/'' -e ''s/.*DEBUG.*/\x1b[36m&\x1b[0m/''"'
         - 'alias nvtop="gpustat -a -i 1"'
         - 'export PATH="$PATH:/home/{{ linux_user }}/.local/bin"'
         - '[ -z "$SSH_CONNECTION" ] && [ -t 1 ] && btop'
@@ -397,7 +396,7 @@
     - name: Reboot if necessary
       reboot:
         msg: "Rebooting system..."
-      when: apt_update_upgrade.changed or snap_refresh.changed or emby_install.changed or transmission_settings.changed
+      when: apt_update_upgrade.changed or snap_refresh.changed or emby_install.changed
       tags: [reboot]
 
   handlers:
