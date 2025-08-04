@@ -174,7 +174,6 @@
         job: "/usr/bin/python3 /home/avelis/source/Home_Automation/embysync.py >/dev/null 2>&1"
         user: avelis
         state: present
-      #become: yes
 
     - name: Get latest Emby version from GitHub API
       uri:
@@ -387,6 +386,7 @@
         - 'alias ls="ls -lhAp --color=always"'
         - 'alias ll="ls -lhAp --color=always"'
         - 'alias update="sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y && sudo snap refresh"'
+        - 'alias embysynclog="tail -f /var/log/emby-sync.log | grep --color=always -E "(ERROR|WARNING|INFO|DEBUG|.*)"'
         - 'alias nvtop="gpustat -a -i 1"'
         - 'export PATH="$PATH:/home/{{ linux_user }}/.local/bin"'
         - '[ -z "$SSH_CONNECTION" ] && [ -t 1 ] && btop'
