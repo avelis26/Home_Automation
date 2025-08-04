@@ -124,7 +124,7 @@ class EmbySync:
             return False
 
     def sync_files(self):
-        """Perform rsync with checksum comparison and exclusions"""
+        """Perform rsync with time and date comparison and exclusions"""
         destination = f"{self.dest_user}@{self.dest_host}:{self.dest_path}/"
         
         cmd = [
