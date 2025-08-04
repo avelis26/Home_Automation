@@ -31,6 +31,11 @@
       - nfs-kernel-server
   tasks:
     # System Setup and Package Management
+    - name: Set timezone to America/Chicago
+      community.general.timezone:
+        name: America/Chicago
+      become: yes
+
     - name: Update APT cache and upgrade
       apt:
         update_cache: yes
