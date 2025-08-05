@@ -7,12 +7,17 @@ LOG_FILE="/var/log/emby-sync.log"
 BACKUP_DIR="/var/log"
 TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
 
+echo $LOG_FILE
+echo $BACKUP_DIR
+echo $TIMESTAMP
+
 # Copy and compress the log
-cp "$LOG_FILE" "${BACKUP_DIR}/emby-sync_${TIMESTAMP}.log"
-gzip "${BACKUP_DIR}/emby-sync_${TIMESTAMP}.log"
+echo "cp $LOG_FILE" "${BACKUP_DIR}/emby-sync_${TIMESTAMP}.log"
+sudo cp "$LOG_FILE" "${BACKUP_DIR}/emby-sync_${TIMESTAMP}.log"
+sudo gzip "${BACKUP_DIR}/emby-sync_${TIMESTAMP}.log"
 
 # Clear the original log
-> "$LOG_FILE"
+echo "Emby Sync Log: ${TIMESTAMP}" > "$LOG_FILE"
 
 # Keep only last 7 compressed logs
 cd "$BACKUP_DIR"
