@@ -180,7 +180,7 @@
         day: "*/2"
         job: "/usr/bin/python3 /home/avelis/source/Home_Automation/embysync.py >/dev/null 2>&1"
         user: avelis
-        state: absent
+        state: present
 
     - name: Create Rotate Emby Sync Log Cron Job
       ansible.builtin.cron:
@@ -190,7 +190,7 @@
         weekday: "0"
         job: "/home/avelis/source/Home_Automation/rotate-emby-log.sh"
         user: avelis
-        state: absent
+        state: present
 
     - name: Get latest Emby version from GitHub API
       uri:

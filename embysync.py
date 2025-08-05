@@ -27,8 +27,8 @@ class EmbySync:
         self.max_retries = 3
         
         # Sleep hours (24-hour format)
-        self.sleep_start = 23
-        self.sleep_end = 9
+        self.sleep_start = 0
+        self.sleep_end = 24
         
         # Files/patterns to exclude (embytwo-only content)
         # Add your show names here - supports wildcards
