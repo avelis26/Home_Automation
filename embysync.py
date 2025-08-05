@@ -23,7 +23,7 @@ class EmbySync:
         self.log_file = "/var/log/emby-sync.log"
         self.lock_file = "/tmp/emby-sync.lock"
         self.exclude_file = "/tmp/emby-sync-exclude.txt"
-        self.bandwidth_limit = "1028" # KB/s
+        self.bandwidth_limit = "800" # KB/s
         self.max_retries = 3
         
         # Sleep hours (24-hour format)
