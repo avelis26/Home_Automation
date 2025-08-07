@@ -21,7 +21,7 @@ class EmbySync:
         self.dry_run = False
         
         self.logger = logging.getLogger('EmbySync')
-        self.logger.setLevel(logging.INFO)
+        self.logger.setLevel(logging.DEBUG)
         handler = RotatingFileHandler('/var/log/emby-sync.log', maxBytes=10485760, backupCount=5)
         handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.addHandler(handler)
@@ -139,6 +139,7 @@ print(json.dumps(remote_files))
                         stat_info = os.stat(file_path)
                         self.logger.debug(f"Calculating MD5 for {file}")
                         md5_hash = self.calculate_md5(file_path)
+                        self.logger.debug(f"Calculated MD5 for {file_name}: {md5_hash}")
                         if md5_hash:
                             local_files[rel_path] = {
                                 'size': stat_info.st_size,
