@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Made by Graham Pinkston (graham.pinkston@gmail.com) with the help of Claude & Grok (Claude is better)
-# 2025-08-07_01:46
+# 2025-08-07_03:08
 import json
 import logging
 import os
@@ -17,8 +17,8 @@ class EmbySync:
         self.remote_base_path = "/mnt/data/Media"
         self.remote_user = "grace"
         self.remote_host = "embytwo"
-        self.scan_paths = ["tmp", "tmp2"]
-        self.bandwidth_limit = "4096"
+        self.scan_paths = ["Shows", "Movies"]
+        self.bandwidth_limit = "666"
         self.exclusions = []
         self.dry_run = False
 
