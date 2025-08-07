@@ -14,6 +14,7 @@ class EmbySync:
         self.remote_user = "grace"
         self.remote_host = "embytwo"
         self.scan_paths = ["tmp", "tmp2"]  # Single source of truth for scan_paths
+        self.bandwidth_limit = "4096"  # KB/s
         self.exclusions = []
         self.dry_run = False
         
@@ -171,7 +172,7 @@ print(json.dumps(remote_files))
                 if not self.dry_run:
                     try:
                         self.logger.info(f"Syncing file: {file_name}")
-                        cmd = f"rsync -av --progress '{local_path}' {self.remote_user}@{self.remote_host}:'{remote_path}'"
+                        cmd = f"rsync -avzh --progress --partial --bwlimit={self.bandwidth_limit} '{local_path}' {self.remote_user}@{self.remote_host}:'{remote_path}'"
                         subprocess.run(cmd, shell=True, check=True)
                     except subprocess.CalledProcessError as e:
                         self.logger.error(f"Failed to sync {file_name}: {e.stderr}")
