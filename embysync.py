@@ -13,7 +13,7 @@ class EmbySync:
         self.remote_base_path = "/mnt/data/Media"
         self.remote_user = "grace"
         self.remote_host = "embytwo"
-        self.scan_paths = ["tmp"]  # Single source of truth for scan_paths
+        self.scan_paths = ["tmp", "tmp2"]  # Single source of truth for scan_paths
         self.exclusions = []
         self.dry_run = False
         
