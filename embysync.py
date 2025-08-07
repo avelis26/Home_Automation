@@ -24,7 +24,7 @@ class EmbySync:
         self.bandwidth_limit = "666"
         self.exclusions = []
         self.dry_run = False
-        self.lock_file = "/var/run/emby-sync.lock"
+        self.lock_file = "/tmp/emby-sync.lock"
         self.lock_fd = None
 
         self.logger = logging.getLogger('EmbySync')
@@ -48,14 +48,20 @@ class EmbySync:
             self.lock_fd.flush()
             self.logger.info(f"Acquired lock file: {self.lock_file}")
             return True
-        except IOError:
-            self.logger.error(f"Another instance is already running (lock file: {self.lock_file})")
+        except IOError as e:
+            if e.errno == 11 or e.errno == 35:
+                self.logger.error(f"Another instance is already running (lock file: {self.lock_file})")
+            elif e.errno == 13:
+                self.logger.error(f"Permission denied accessing lock file: {self.lock_file}")
+            else:
+                self.logger.error(f"Failed to acquire lock: {e}")
+            
             if self.lock_fd:
                 self.lock_fd.close()
                 self.lock_fd = None
             return False
         except Exception as e:
-            self.logger.error(f"Failed to acquire lock: {e}")
+            self.logger.error(f"Unexpected error acquiring lock: {e}")
             if self.lock_fd:
                 self.lock_fd.close()
                 self.lock_fd = None
