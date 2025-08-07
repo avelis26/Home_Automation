@@ -412,7 +412,10 @@
     - name: Reboot if necessary
       reboot:
         msg: "Rebooting system..."
-      when: apt_update_upgrade.changed or snap_refresh.changed or emby_install.changed
+      when:
+          - apt_update_upgrade.changed
+          - snap_refresh.changed
+          - (emby_install is defined and emby_install.changed)
       tags: [reboot]
 
   handlers:
