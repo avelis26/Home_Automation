@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Made by Graham Pinkston (graham.pinkston@gmail.com) with the help of Claude & Grok (Claude is better)
+# 2025-08-07_01:46
 import os
 import json
 import subprocess
@@ -15,11 +17,10 @@ class EmbySync:
         self.remote_user = "grace"
         self.remote_host = "embytwo"
         self.scan_paths = ["tmp", "tmp2"]
-        self.bandwidth_limit = "4096"  # KB/s
+        self.bandwidth_limit = "4096"
         self.exclusions = []
         self.dry_run = False
 
-        # Setup logging
         self.logger = logging.getLogger('EmbySync')
         self.logger.setLevel(logging.INFO)
         handler = RotatingFileHandler('/var/log/emby-sync.log', maxBytes=10485760, backupCount=5)
