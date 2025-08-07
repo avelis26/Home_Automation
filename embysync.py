@@ -86,7 +86,7 @@ print(json.dumps(remote_files))
             return False
 
     def scan_local_files(self):
-        self.logger.info(f"Scanning local files from {len(self.scan_paths)} paths...")
+        self.logger.info(f"{len(self.scan_paths)} path(s) to scan...")
         local_files = {}
         
         for rel_scan_path in self.scan_paths:
@@ -157,7 +157,7 @@ print(json.dumps(remote_files))
         
         for rel_path, local_info in local_files.items():
             file_name = os.path.basename(rel_path)
-            self.logger.info(f"Syncing file: {file_name}")
+            #self.logger.info(f"Syncing file: {file_name}")
             local_path = os.path.join(self.local_base_path, rel_path)
             remote_path = os.path.join(self.remote_base_path, rel_path)
             
@@ -171,6 +171,7 @@ print(json.dumps(remote_files))
             if needs_sync:
                 if not self.dry_run:
                     try:
+                        self.logger.info(f"Syncing file: {file_name}")
                         cmd = f"rsync -av --progress '{local_path}' {self.remote_user}@{self.remote_host}:'{remote_path}'"
                         subprocess.run(cmd, shell=True, check=True)
                     except subprocess.CalledProcessError as e:
