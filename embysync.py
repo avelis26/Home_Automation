@@ -6,6 +6,7 @@ import logging
 import os
 import subprocess
 import tempfile
+import shlex
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -209,7 +210,9 @@ print(json.dumps(remote_files))
             remote_dir = os.path.join(self.remote_base_path, dir_path)
             if not self.dry_run:
                 try:
-                    remote_command = f"mkdir -p '{remote_dir}'"
+                    # Use shlex.quote to properly escape the path
+                    escaped_remote_dir = shlex.quote(remote_dir)
+                    remote_command = f"mkdir -p {escaped_remote_dir}"
                     cmd = [
                         'ssh',
                         f'{self.remote_user}@{self.remote_host}',
