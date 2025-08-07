@@ -21,7 +21,8 @@ class EmbySync:
         # Setup logging
         self.logger = logging.getLogger('EmbySync')
         self.logger.setLevel(logging.INFO)
-        handler = logging.StreamHandler()
+        #handler = logging.StreamHandler()
+        handler = logging.FileHandler('/var/log/emby-sync.log')
         handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.addHandler(handler)
         
