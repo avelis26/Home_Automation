@@ -179,7 +179,7 @@
         hour: "3"
         job: "/usr/bin/python3 /home/avelis/source/Home_Automation/embysync.py"
         user: avelis
-        state: absent
+        state: present
 
     - name: Create Rotate Emby Sync Log Cron Job
       ansible.builtin.cron:
