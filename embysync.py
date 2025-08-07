@@ -3,6 +3,7 @@ import os
 import json
 import subprocess
 import logging
+from logging.handlers import RotatingFileHandler
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -23,7 +24,7 @@ class EmbySync:
         self.logger.setLevel(logging.INFO)
         #handler = logging.StreamHandler()
         #handler = logging.FileHandler('/var/log/emby-sync.log')
-        handler = logging.handlers.RotatingFileHandler('/var/log/emby-sync.log', maxBytes=10485760, backupCount=5)
+        handler = RotatingFileHandler('/var/log/emby-sync.log', maxBytes=10485760, backupCount=5)
         handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.addHandler(handler)
         
@@ -73,7 +74,7 @@ print(json.dumps(remote_files))
         try:
             result = subprocess.run(
                 f"ssh {self.remote_user}@{self.remote_host} echo 'SSH_OK'",
-                shell=True, stderr=subprocess.PIPE,
+                shell=True,
                 capture_output=True,
                 text=True,
                 check=True
@@ -134,8 +135,7 @@ print(json.dumps(remote_files))
         try:
             remote_script_path = "/tmp/embysync_remote.py"
             scp_cmd = f"scp {temp_file_path} {self.remote_user}@{self.remote_host}:{remote_script_path}"
-            #subprocess.run(scp_cmd, shell=True, check=True, capture_output=True, text=True)
-            subprocess.run(scp_cmd, shell=True, check=True, capture_output=True, text=True, stderr=subprocess.PIPE)
+            subprocess.run(scp_cmd, shell=True, check=True, capture_output=True, text=True)
 
             cmd = f"ssh {self.remote_user}@{self.remote_host} python3 {remote_script_path}"
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
@@ -176,8 +176,7 @@ print(json.dumps(remote_files))
                     try:
                         self.logger.info(f"Syncing file: {file_name}")
                         cmd = f"rsync -avzh --progress --partial --bwlimit={self.bandwidth_limit} '{local_path}' {self.remote_user}@{self.remote_host}:'{remote_path}'"
-                        #subprocess.run(cmd, shell=True, check=True)
-                        subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True, stderr=subprocess.PIPE)
+                        subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
                     except subprocess.CalledProcessError as e:
                         self.logger.error(f"Failed to sync {file_name}: {e.stderr}")
                 else:
@@ -200,8 +199,7 @@ print(json.dumps(remote_files))
             if not self.dry_run:
                 try:
                     cmd = f"ssh {self.remote_user}@{self.remote_host} rm -f '{remote_path}'"
-                    #subprocess.run(cmd, shell=True, check=True)
-                    subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True, stderr=subprocess.PIPE)
+                    subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
                     self.logger.info(f"Removed remote file: {file_name}")
                 except subprocess.CalledProcessError as e:
                     self.logger.error(f"Failed to remove {file_name}: {e.stderr}")
