@@ -21,4 +21,4 @@ echo "Emby Sync Log: ${TIMESTAMP}" > "$LOG_FILE"
 
 # Keep only last 7 compressed logs
 cd "$BACKUP_DIR"
-ls -t emby-sync_*.log.gz | tail -n +8 | xargs -r rm
+ls -t emby-sync_*.log.gz | tail -n +8 | sudo xargs -r rm
