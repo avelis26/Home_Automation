@@ -207,9 +207,9 @@ import os
 import json
 from pathlib import Path
 
-exclusions = {self.exclusions}
+exclusions = {self.exclusions!r}
 base_path = "{self.dest_path}"
-scan_paths = {relative_paths}
+scan_paths = {relative_paths!r}
 
 remote_files = {{}}
 for rel_scan_path in scan_paths:
