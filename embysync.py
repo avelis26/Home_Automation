@@ -372,12 +372,14 @@ print(json.dumps(remote_files))
             
             if not self.dry_run:
                 try:
+                    # Properly quote the paths to handle special characters
+                    quoted_old_path = shlex.quote(old_full_path)
+                    quoted_new_path = shlex.quote(new_full_path)
+                    
                     cmd = [
                         'ssh',
                         f'{self.remote_user}@{self.remote_host}',
-                        'mv',
-                        old_full_path,
-                        new_full_path
+                        f'mv {quoted_old_path} {quoted_new_path}'
                     ]
                     subprocess.run(
                         cmd,
@@ -408,12 +410,14 @@ print(json.dumps(remote_files))
             
             if not self.dry_run:
                 try:
+                    # Properly quote the paths to handle special characters
+                    quoted_old_path = shlex.quote(old_full_path)
+                    quoted_new_path = shlex.quote(new_full_path)
+                    
                     cmd = [
                         'ssh',
                         f'{self.remote_user}@{self.remote_host}',
-                        'mv',
-                        old_full_path,
-                        new_full_path
+                        f'mv {quoted_old_path} {quoted_new_path}'
                     ]
                     subprocess.run(
                         cmd,
