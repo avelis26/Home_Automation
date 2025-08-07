@@ -1,24 +1,6 @@
 #!/usr/bin/env python3
 # Made by Graham Pinkston (graham.pinkston@gmail.com) with the help of Claude & Grok (Claude is better)
 # 2025-08-07_11:30
-
-#Emby Sync Log: 20250807_121622
-#2025-08-07 12:16:34,284 - INFO - Smart Emby sync script started
-#2025-08-07 12:16:34,284 - INFO - Acquired lock file: /tmp/emby-sync.lock
-#2025-08-07 12:16:34,284 - INFO - Testing SSH connection to embytwo...
-#2025-08-07 12:16:37,318 - INFO - SSH connection successful
-#2025-08-07 12:16:37,318 - INFO - 2 path(s) to scan...
-#2025-08-07 12:16:37,319 - INFO - Scanning: /mnt/data/Media/Shows
-#2025-08-07 12:16:37,738 - INFO - Scanning: /mnt/data/Media/Movies
-#2025-08-07 12:16:38,134 - INFO - Found 80487 local files
-#2025-08-07 12:16:38,134 - INFO - Scanning remote files...
-#2025-08-07 12:16:57,959 - INFO - Performing 1 directory renames on remote...
-#2025-08-07 12:16:59,347 - ERROR - Failed to rename directory Shows/Brooklyn_Nine-Nine_(2013)_[269586]/Brooklyn_Nine-Nine_Season_05: bash: -c: line 1: syntax error near unexpected token `('
-#bash: -c: line 1: `mv /mnt/data/Media/Shows/Brooklyn_Nine-Nine_(2013)_[269586]/Brooklyn_Nine-Nine_Season_05 /mnt/data/Media/Shows/Brooklyn_Nine-Nine_(2013)_[269586]/Featurettes'
-#2025-08-07 12:16:59,386 - INFO - Ensuring 3740 remote directories exist...
-
-
-
 import json
 import logging
 import os
@@ -31,7 +13,6 @@ from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-
 class EmbySync:
     def __init__(self):
         self.local_base_path = "/mnt/data/Media"
@@ -39,7 +20,7 @@ class EmbySync:
         self.remote_user = "grace"
         self.remote_host = "embytwo"
         self.scan_paths = ["Shows", "Movies"]
-        self.bandwidth_limit = "666"
+        self.bandwidth_limit = "500"
         self.exclusions = []
         self.dry_run = False
         self.lock_file = "/tmp/emby-sync.lock"
@@ -372,7 +353,6 @@ print(json.dumps(remote_files))
             
             if not self.dry_run:
                 try:
-                    # Properly quote the paths to handle special characters
                     quoted_old_path = shlex.quote(old_full_path)
                     quoted_new_path = shlex.quote(new_full_path)
                     
@@ -410,7 +390,6 @@ print(json.dumps(remote_files))
             
             if not self.dry_run:
                 try:
-                    # Properly quote the paths to handle special characters
                     quoted_old_path = shlex.quote(old_full_path)
                     quoted_new_path = shlex.quote(new_full_path)
                     
