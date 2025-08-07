@@ -209,13 +209,14 @@ print(json.dumps(remote_files))
             remote_dir = os.path.join(self.remote_base_path, dir_path)
             if not self.dry_run:
                 try:
-                    cmd = (
-                        f"ssh {self.remote_user}@{self.remote_host} "
-                        f"mkdir -p '{remote_dir}'"
-                    )
+                    remote_command = f"mkdir -p '{remote_dir}'"
+                    cmd = [
+                        'ssh',
+                        f'{self.remote_user}@{self.remote_host}',
+                        remote_command
+                    ]
                     subprocess.run(
                         cmd,
-                        shell=True,
                         check=True,
                         capture_output=True,
                         text=True
@@ -264,7 +265,6 @@ print(json.dumps(remote_files))
         local_dirs = {}
         remote_dirs = {}
         
-        # Group files by directory and create directory signatures
         for rel_path, info in local_files.items():
             dir_path = os.path.dirname(rel_path)
             if dir_path:
@@ -279,16 +279,14 @@ print(json.dumps(remote_files))
                     remote_dirs[dir_path] = []
                 remote_dirs[dir_path].append((os.path.basename(rel_path), info['size']))
         
-        # Create signatures (sorted list of filename+size tuples)
         local_signatures = {dir_path: tuple(sorted(files)) for dir_path, files in local_dirs.items()}
         remote_signatures = {dir_path: tuple(sorted(files)) for dir_path, files in remote_dirs.items()}
         
-        # Find matching signatures
         for local_dir, local_sig in local_signatures.items():
             for remote_dir, remote_sig in remote_signatures.items():
                 if (local_sig == remote_sig and 
                     local_dir != remote_dir and
-                    os.path.dirname(local_dir) == os.path.dirname(remote_dir)):  # Same parent dir
+                    os.path.dirname(local_dir) == os.path.dirname(remote_dir)):
                     dir_renames[remote_dir] = local_dir
                     break
         
@@ -309,13 +307,15 @@ print(json.dumps(remote_files))
             
             if not self.dry_run:
                 try:
-                    cmd = (
-                        f"ssh {self.remote_user}@{self.remote_host} "
-                        f"mv '{old_full_path}' '{new_full_path}'"
-                    )
+                    cmd = [
+                        'ssh',
+                        f'{self.remote_user}@{self.remote_host}',
+                        'mv',
+                        old_full_path,
+                        new_full_path
+                    ]
                     subprocess.run(
                         cmd,
-                        shell=True,
                         check=True,
                         capture_output=True,
                         text=True
@@ -343,8 +343,19 @@ print(json.dumps(remote_files))
             
             if not self.dry_run:
                 try:
-                    cmd = f"ssh {self.remote_user}@{self.remote_host} mv '{old_full_path}' '{new_full_path}'"
-                    subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+                    cmd = [
+                        'ssh',
+                        f'{self.remote_user}@{self.remote_host}',
+                        'mv',
+                        old_full_path,
+                        new_full_path
+                    ]
+                    subprocess.run(
+                        cmd,
+                        check=True,
+                        capture_output=True,
+                        text=True
+                    )
                     self.logger.info(f"Renamed remote directory: {old_remote_dir} -> {new_local_dir}")
                 except subprocess.CalledProcessError as e:
                     self.logger.error(f"Failed to rename directory {old_remote_dir}: {e.stderr}")
@@ -376,14 +387,17 @@ print(json.dumps(remote_files))
                 if not self.dry_run:
                     try:
                         self.logger.info(f"Syncing file: {file_name}")
-                        cmd = (
-                            f"rsync -avzh --progress --partial "
-                            f"--bwlimit={self.bandwidth_limit} '{local_path}' "
-                            f"{self.remote_user}@{self.remote_host}:'{remote_path}'"
-                        )
+                        cmd = [
+                            'rsync',
+                            '-avzh',
+                            '--progress',
+                            '--partial',
+                            f'--bwlimit={self.bandwidth_limit}',
+                            local_path,
+                            f'{self.remote_user}@{self.remote_host}:{remote_path}'
+                        ]
                         subprocess.run(
                             cmd,
-                            shell=True,
                             check=True,
                             capture_output=True,
                             text=True
@@ -416,13 +430,15 @@ print(json.dumps(remote_files))
             remote_path = os.path.join(self.remote_base_path, rel_path)
             if not self.dry_run:
                 try:
-                    cmd = (
-                        f"ssh {self.remote_user}@{self.remote_host} "
-                        f"rm -f '{remote_path}'"
-                    )
+                    cmd = [
+                        'ssh',
+                        f'{self.remote_user}@{self.remote_host}',
+                        'rm',
+                        '-f',
+                        remote_path
+                    ]
                     subprocess.run(
                         cmd,
-                        shell=True,
                         check=True,
                         capture_output=True,
                         text=True
@@ -436,7 +452,6 @@ print(json.dumps(remote_files))
     def cleanup_remote_dirs(self, local_files, remote_files, dir_renames=None):
         renamed_dirs = set(dir_renames.values()) if dir_renames else set()
 
-        # Collect local and remote directory paths relative to base
         local_dirs = set(os.path.dirname(path) for path in local_files if os.path.dirname(path))
         remote_dirs = set(os.path.dirname(path) for path in remote_files if os.path.dirname(path))
 
@@ -444,7 +459,7 @@ print(json.dumps(remote_files))
             d for d in remote_dirs
             if d not in local_dirs
             and d not in dir_renames
-            and os.path.dirname(d) == os.path.dirname(d)  # optional: ensure same parent
+            and os.path.dirname(d) == os.path.dirname(d)
         ]
         if not dirs_to_remove:
             return self.logger.info("No extra remote directories to clean up")
@@ -454,8 +469,18 @@ print(json.dumps(remote_files))
             remote_full = os.path.join(self.remote_base_path, d)
             if not self.dry_run:
                 try:
-                    cmd = f"ssh {self.remote_user}@{self.remote_host} rmdir '{remote_full}'"
-                    subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+                    cmd = [
+                        'ssh',
+                        f'{self.remote_user}@{self.remote_host}',
+                        'rmdir',
+                        remote_full
+                    ]
+                    subprocess.run(
+                        cmd,
+                        check=True,
+                        capture_output=True,
+                        text=True
+                    )
                     self.logger.info(f"Removed remote directory: {d}")
                 except subprocess.CalledProcessError as e:
                     self.logger.error(f"Failed to remove directory {d}: {e.stderr}")
