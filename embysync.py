@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # Made by Graham Pinkston (graham.pinkston@gmail.com) with the help of Claude & Grok (Claude is better)
 # 2025-08-07_01:46
-import os
 import json
-import subprocess
 import logging
-from logging.handlers import RotatingFileHandler
+import os
+import subprocess
 import tempfile
 from datetime import datetime
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
 
 class EmbySync:
     def __init__(self):
@@ -23,8 +24,14 @@ class EmbySync:
 
         self.logger = logging.getLogger('EmbySync')
         self.logger.setLevel(logging.INFO)
-        handler = RotatingFileHandler('/var/log/emby-sync.log', maxBytes=10485760, backupCount=5)
-        handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        handler = RotatingFileHandler(
+            '/var/log/emby-sync.log',
+            maxBytes=10485760,
+            backupCount=5
+        )
+        handler.setFormatter(
+            logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        )
         self.logger.addHandler(handler)
 
     def _generate_remote_script(self):
@@ -69,7 +76,7 @@ print(json.dumps(remote_files))
         return script
 
     def test_ssh_connection(self):
-        self.logger.info("Testing SSH connection to {}...".format(self.remote_host))
+        self.logger.info(f"Testing SSH connection to {self.remote_host}...")
         try:
             result = subprocess.run(
                 f"ssh {self.remote_user}@{self.remote_host} echo 'SSH_OK'",
@@ -127,17 +134,39 @@ print(json.dumps(remote_files))
         remote_script = self._generate_remote_script()
         self.logger.debug(f"Generated remote script:\n{remote_script}")
         
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode='w',
+            suffix='.py',
+            delete=False
+        ) as temp_file:
             temp_file.write(remote_script)
             temp_file_path = temp_file.name
 
         try:
             remote_script_path = "/tmp/embysync_remote.py"
-            scp_cmd = f"scp {temp_file_path} {self.remote_user}@{self.remote_host}:{remote_script_path}"
-            subprocess.run(scp_cmd, shell=True, check=True, capture_output=True, text=True)
+            scp_cmd = (
+                f"scp {temp_file_path} "
+                f"{self.remote_user}@{self.remote_host}:{remote_script_path}"
+            )
+            subprocess.run(
+                scp_cmd,
+                shell=True,
+                check=True,
+                capture_output=True,
+                text=True
+            )
 
-            cmd = f"ssh {self.remote_user}@{self.remote_host} python3 {remote_script_path}"
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
+            cmd = (
+                f"ssh {self.remote_user}@{self.remote_host} "
+                f"python3 {remote_script_path}"
+            )
+            result = subprocess.run(
+                cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                check=True
+            )
             
             remote_files = json.loads(result.stdout)
             return remote_files
@@ -150,13 +179,21 @@ print(json.dumps(remote_files))
         finally:
             os.unlink(temp_file_path)
             try:
-                cleanup_cmd = f"ssh {self.remote_user}@{self.remote_host} rm -f {remote_script_path}"
-                subprocess.run(cleanup_cmd, shell=True, check=True, capture_output=True, text=True)
+                cleanup_cmd = (
+                    f"ssh {self.remote_user}@{self.remote_host} "
+                    f"rm -f {remote_script_path}"
+                )
+                subprocess.run(
+                    cleanup_cmd,
+                    shell=True,
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
             except subprocess.CalledProcessError as e:
                 self.logger.warning(f"Failed to clean up remote script: {e.stderr}")
 
     def ensure_remote_directories(self, local_files):
-        """Create necessary directories on remote server"""
         directories = set()
         for rel_path in local_files.keys():
             dir_path = os.path.dirname(rel_path)
@@ -172,16 +209,26 @@ print(json.dumps(remote_files))
             remote_dir = os.path.join(self.remote_base_path, dir_path)
             if not self.dry_run:
                 try:
-                    cmd = f"ssh {self.remote_user}@{self.remote_host} mkdir -p '{remote_dir}'"
-                    subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+                    cmd = (
+                        f"ssh {self.remote_user}@{self.remote_host} "
+                        f"mkdir -p '{remote_dir}'"
+                    )
+                    subprocess.run(
+                        cmd,
+                        shell=True,
+                        check=True,
+                        capture_output=True,
+                        text=True
+                    )
                     self.logger.debug(f"Created remote directory: {dir_path}")
                 except subprocess.CalledProcessError as e:
-                    self.logger.error(f"Failed to create remote directory {dir_path}: {e.stderr}")
+                    self.logger.error(
+                        f"Failed to create remote directory {dir_path}: {e.stderr}"
+                    )
             else:
                 self.logger.info(f"[DRY RUN] Would create directory: {dir_path}")
 
     def detect_renames(self, local_files, remote_files):
-        """Detect files that have been renamed by matching size and mtime"""
         renames = {}
         local_by_signature = {}
         remote_by_signature = {}
@@ -205,13 +252,13 @@ print(json.dumps(remote_files))
                     local_path = local_paths[0]
                     remote_path = remote_paths[0]
                     if local_path != remote_path:
-                        if os.path.dirname(local_path) == os.path.dirname(remote_path):
+                        if (os.path.dirname(local_path) == 
+                            os.path.dirname(remote_path)):
                             renames[remote_path] = local_path
         
         return renames
 
     def perform_renames(self, renames):
-        """Execute renames on remote server"""
         if not renames:
             return
             
@@ -226,13 +273,26 @@ print(json.dumps(remote_files))
             
             if not self.dry_run:
                 try:
-                    cmd = f"ssh {self.remote_user}@{self.remote_host} mv '{old_full_path}' '{new_full_path}'"
-                    subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
-                    self.logger.info(f"Renamed remote file: {old_file_name} -> {new_file_name}")
+                    cmd = (
+                        f"ssh {self.remote_user}@{self.remote_host} "
+                        f"mv '{old_full_path}' '{new_full_path}'"
+                    )
+                    subprocess.run(
+                        cmd,
+                        shell=True,
+                        check=True,
+                        capture_output=True,
+                        text=True
+                    )
+                    self.logger.info(
+                        f"Renamed remote file: {old_file_name} -> {new_file_name}"
+                    )
                 except subprocess.CalledProcessError as e:
                     self.logger.error(f"Failed to rename {old_file_name}: {e.stderr}")
             else:
-                self.logger.info(f"[DRY RUN] Would rename: {old_file_name} -> {new_file_name}")
+                self.logger.info(
+                    f"[DRY RUN] Would rename: {old_file_name} -> {new_file_name}"
+                )
 
     def sync_files(self, local_files, remote_files, renames=None):
         self.logger.info(f"Processing {len(local_files)} files...")
@@ -258,8 +318,18 @@ print(json.dumps(remote_files))
                 if not self.dry_run:
                     try:
                         self.logger.info(f"Syncing file: {file_name}")
-                        cmd = f"rsync -avzh --progress --partial --bwlimit={self.bandwidth_limit} '{local_path}' {self.remote_user}@{self.remote_host}:'{remote_path}'"
-                        subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+                        cmd = (
+                            f"rsync -avzh --progress --partial "
+                            f"--bwlimit={self.bandwidth_limit} '{local_path}' "
+                            f"{self.remote_user}@{self.remote_host}:'{remote_path}'"
+                        )
+                        subprocess.run(
+                            cmd,
+                            shell=True,
+                            check=True,
+                            capture_output=True,
+                            text=True
+                        )
                     except subprocess.CalledProcessError as e:
                         self.logger.error(f"Failed to sync {file_name}: {e.stderr}")
                 else:
@@ -268,9 +338,11 @@ print(json.dumps(remote_files))
         self.logger.info("File sync completed successfully")
 
     def cleanup_remote_files(self, local_files, remote_files, renames=None):
-        files_to_remove = [rel_path for rel_path in remote_files 
-                          if rel_path not in local_files and 
-                          (not renames or rel_path not in renames)]
+        files_to_remove = [
+            rel_path for rel_path in remote_files 
+            if rel_path not in local_files and 
+            (not renames or rel_path not in renames)
+        ]
         
         if not files_to_remove:
             self.logger.info("No remote files to clean up")
@@ -283,8 +355,17 @@ print(json.dumps(remote_files))
             remote_path = os.path.join(self.remote_base_path, rel_path)
             if not self.dry_run:
                 try:
-                    cmd = f"ssh {self.remote_user}@{self.remote_host} rm -f '{remote_path}'"
-                    subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+                    cmd = (
+                        f"ssh {self.remote_user}@{self.remote_host} "
+                        f"rm -f '{remote_path}'"
+                    )
+                    subprocess.run(
+                        cmd,
+                        shell=True,
+                        check=True,
+                        capture_output=True,
+                        text=True
+                    )
                     self.logger.info(f"Removed remote file: {file_name}")
                 except subprocess.CalledProcessError as e:
                     self.logger.error(f"Failed to remove {file_name}: {e.stderr}")
@@ -311,7 +392,8 @@ print(json.dumps(remote_files))
         self.cleanup_remote_files(local_files, remote_files, renames)
         
         self.logger.info("Smart sync completed successfully")
-        
+
+
 if __name__ == "__main__":
     sync = EmbySync()
     try:
