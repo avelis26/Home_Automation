@@ -7,6 +7,7 @@ from logging.handlers import RotatingFileHandler
 import tempfile
 from datetime import datetime
 from pathlib import Path
+import hashlib
 
 class EmbySync:
     def __init__(self):
@@ -14,16 +15,13 @@ class EmbySync:
         self.remote_base_path = "/mnt/data/Media"
         self.remote_user = "grace"
         self.remote_host = "embytwo"
-        self.scan_paths = ["tmp", "tmp2"]  # Single source of truth for scan_paths
-        self.bandwidth_limit = "4096"  # KB/s
+        self.scan_paths = ["tmp", "tmp2"]
+        self.bandwidth_limit = "4096"
         self.exclusions = []
         self.dry_run = False
         
-        # Setup logging
         self.logger = logging.getLogger('EmbySync')
         self.logger.setLevel(logging.INFO)
-        #handler = logging.StreamHandler()
-        #handler = logging.FileHandler('/var/log/emby-sync.log')
         handler = RotatingFileHandler('/var/log/emby-sync.log', maxBytes=10485760, backupCount=5)
         handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.addHandler(handler)
@@ -33,7 +31,18 @@ class EmbySync:
         script = f"""
 import os
 import json
+import hashlib
 from pathlib import Path
+
+def calculate_md5(file_path, chunk_size=8192):
+    hash_md5 = hashlib.md5()
+    try:
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(chunk_size), b""):
+                hash_md5.update(chunk)
+        return hash_md5.hexdigest()
+    except Exception:
+        return None
 
 exclusions = []
 base_path = "/mnt/data/Media"
@@ -58,16 +67,31 @@ for rel_scan_path in scan_paths:
             
             try:
                 stat_info = os.stat(file_path)
-                remote_files[rel_path] = {{
-                    'size': stat_info.st_size,
-                    'mtime': stat_info.st_mtime
-                }}
+                md5_hash = calculate_md5(file_path)
+                if md5_hash:
+                    remote_files[rel_path] = {{
+                        'size': stat_info.st_size,
+                        'mtime': stat_info.st_mtime,
+                        'md5': md5_hash
+                    }}
             except Exception:
                 pass
 
 print(json.dumps(remote_files))
 """
         return script
+
+    def calculate_md5(self, file_path, chunk_size=8192):
+        """Calculate MD5 hash of a file"""
+        hash_md5 = hashlib.md5()
+        try:
+            with open(file_path, "rb") as f:
+                for chunk in iter(lambda: f.read(chunk_size), b""):
+                    hash_md5.update(chunk)
+            return hash_md5.hexdigest()
+        except Exception as e:
+            self.logger.warning(f"Failed to calculate MD5 for {file_path}: {e}")
+            return None
 
     def test_ssh_connection(self):
         self.logger.info("Testing SSH connection to {}...".format(self.remote_host))
@@ -113,10 +137,14 @@ print(json.dumps(remote_files))
                         
                     try:
                         stat_info = os.stat(file_path)
-                        local_files[rel_path] = {
-                            'size': stat_info.st_size,
-                            'mtime': stat_info.st_mtime
-                        }
+                        self.logger.debug(f"Calculating MD5 for {file}")
+                        md5_hash = self.calculate_md5(file_path)
+                        if md5_hash:
+                            local_files[rel_path] = {
+                                'size': stat_info.st_size,
+                                'mtime': stat_info.st_mtime,
+                                'md5': md5_hash
+                            }
                     except Exception:
                         pass
                         
@@ -141,6 +169,7 @@ print(json.dumps(remote_files))
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
             
             remote_files = json.loads(result.stdout)
+            self.logger.info(f"Found {len(remote_files)} remote files")
             return remote_files
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Remote scan failed: {e.stderr}")
@@ -161,7 +190,7 @@ print(json.dumps(remote_files))
         directories = set()
         for rel_path in local_files.keys():
             dir_path = os.path.dirname(rel_path)
-            if dir_path:  # Skip if file is in root
+            if dir_path:
                 directories.add(dir_path)
         
         if not directories:
@@ -182,34 +211,32 @@ print(json.dumps(remote_files))
                 self.logger.info(f"[DRY RUN] Would create directory: {dir_path}")
 
     def detect_renames(self, local_files, remote_files):
-        """Detect files that have been renamed by matching size and mtime"""
-        renames = {}  # remote_path -> local_path
-        local_by_signature = {}
-        remote_by_signature = {}
+        """Detect files that have been renamed by matching MD5 hash"""
+        renames = {}
+        local_by_md5 = {}
+        remote_by_md5 = {}
         
-        # Create signature maps (size + mtime)
         for rel_path, info in local_files.items():
-            signature = (info['size'], int(info['mtime']))
-            if signature not in local_by_signature:
-                local_by_signature[signature] = []
-            local_by_signature[signature].append(rel_path)
+            if 'md5' in info and info['md5']:
+                md5 = info['md5']
+                if md5 not in local_by_md5:
+                    local_by_md5[md5] = []
+                local_by_md5[md5].append(rel_path)
             
         for rel_path, info in remote_files.items():
-            signature = (info['size'], int(info['mtime']))
-            if signature not in remote_by_signature:
-                remote_by_signature[signature] = []
-            remote_by_signature[signature].append(rel_path)
+            if 'md5' in info and info['md5']:
+                md5 = info['md5']
+                if md5 not in remote_by_md5:
+                    remote_by_md5[md5] = []
+                remote_by_md5[md5].append(rel_path)
         
-        # Find renames (files with same signature but different paths)
-        for signature, local_paths in local_by_signature.items():
-            if signature in remote_by_signature:
-                remote_paths = remote_by_signature[signature]
-                # Handle simple 1:1 renames
+        for md5, local_paths in local_by_md5.items():
+            if md5 in remote_by_md5:
+                remote_paths = remote_by_md5[md5]
                 if len(local_paths) == 1 and len(remote_paths) == 1:
                     local_path = local_paths[0]
                     remote_path = remote_paths[0]
                     if local_path != remote_path:
-                        # Same directory rename (most common case)
                         if os.path.dirname(local_path) == os.path.dirname(remote_path):
                             renames[remote_path] = local_path
         
@@ -242,11 +269,11 @@ print(json.dumps(remote_files))
     def sync_files(self, local_files, remote_files, renames=None):
         self.logger.info(f"Processing {len(local_files)} files...")
         
-        # Skip files that were renamed
         renamed_local_files = set(renames.values()) if renames else set()
+        files_synced = 0
+        files_skipped = 0
         
         for rel_path, local_info in local_files.items():
-            # Skip files that were handled by rename
             if rel_path in renamed_local_files:
                 continue
                 
@@ -258,16 +285,18 @@ print(json.dumps(remote_files))
             if rel_path in remote_files:
                 remote_info = remote_files[rel_path]
                 
-                # If sizes are identical, consider files the same regardless of mtime
-                # This handles cases where media tools just touch files
-                if local_info['size'] == remote_info['size']:
+                if ('md5' in local_info and local_info['md5'] and 
+                    'md5' in remote_info and remote_info['md5']):
+                    if local_info['md5'] == remote_info['md5']:
+                        needs_sync = False
+                        files_skipped += 1
+                        self.logger.debug(f"Skipping {file_name} - identical MD5: {local_info['md5'][:8]}...")
+                    else:
+                        self.logger.info(f"MD5 differs for {file_name}: local={local_info['md5'][:8]}... vs remote={remote_info['md5'][:8]}...")
+                elif local_info['size'] == remote_info['size']:
                     needs_sync = False
-                    self.logger.debug(f"Skipping {file_name} - same size ({local_info['size']} bytes)")
-                # If sizes are very close (within 1KB) and mtime is close, skip
-                elif (abs(local_info['size'] - remote_info['size']) < 1024 and
-                      abs(local_info['mtime'] - remote_info['mtime']) < 10):
-                    needs_sync = False
-                    self.logger.debug(f"Skipping {file_name} - similar size and recent mtime")
+                    files_skipped += 1
+                    self.logger.debug(f"Skipping {file_name} - same size ({local_info['size']} bytes), no MD5 available")
                     
             if needs_sync:
                 if not self.dry_run:
@@ -275,12 +304,14 @@ print(json.dumps(remote_files))
                         self.logger.info(f"Syncing file: {file_name}")
                         cmd = f"rsync -avzh --progress --partial --bwlimit={self.bandwidth_limit} '{local_path}' {self.remote_user}@{self.remote_host}:'{remote_path}'"
                         subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+                        files_synced += 1
                     except subprocess.CalledProcessError as e:
                         self.logger.error(f"Failed to sync {file_name}: {e.stderr}")
                 else:
                     self.logger.info(f"[DRY RUN] Would sync: {file_name}")
+                    files_synced += 1
                     
-        self.logger.info("File sync completed successfully")
+        self.logger.info(f"File sync completed successfully - {files_synced} synced, {files_skipped} skipped")
 
     def cleanup_remote_files(self, local_files, remote_files, renames=None):
         files_to_remove = [rel_path for rel_path in remote_files 
@@ -316,7 +347,6 @@ print(json.dumps(remote_files))
         local_files = self.scan_local_files()
         remote_files = self.scan_remote_files()
         
-        # Detect and perform renames first
         renames = self.detect_renames(local_files, remote_files)
         self.perform_renames(renames)
         
