@@ -26,7 +26,7 @@ class SmartEmbySync:
         self.log_file = "/var/log/emby-sync.log"
         self.lock_file = "/tmp/emby-sync.lock"
         self.cache_file = "/tmp/emby-sync-cache.json"
-        self.bandwidth_limit = "2056"  # KB/s
+        self.bandwidth_limit = "4096"  # KB/s
         self.max_retries = 3
         
         # Sleep hours (24-hour format)
