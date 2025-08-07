@@ -433,6 +433,36 @@ print(json.dumps(remote_files))
             else:
                 self.logger.info(f"[DRY RUN] Would remove: {file_name}")
 
+    def cleanup_remote_dirs(self, local_files, remote_files, dir_renames=None):
+        renamed_dirs = set(dir_renames.values()) if dir_renames else set()
+
+        # Collect local and remote directory paths relative to base
+        local_dirs = set(os.path.dirname(path) for path in local_files if os.path.dirname(path))
+        remote_dirs = set(os.path.dirname(path) for path in remote_files if os.path.dirname(path))
+
+        dirs_to_remove = [
+            d for d in remote_dirs
+            if d not in local_dirs
+            and d not in dir_renames
+            and os.path.dirname(d) == os.path.dirname(d)  # optional: ensure same parent
+        ]
+        if not dirs_to_remove:
+            return self.logger.info("No extra remote directories to clean up")
+
+        self.logger.info(f"Removing {len(dirs_to_remove)} extra directories from remote...")
+        for d in sorted(dirs_to_remove, key=lambda x: len(x), reverse=True):
+            remote_full = os.path.join(self.remote_base_path, d)
+            if not self.dry_run:
+                try:
+                    cmd = f"ssh {self.remote_user}@{self.remote_host} rmdir '{remote_full}'"
+                    subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+                    self.logger.info(f"Removed remote directory: {d}")
+                except subprocess.CalledProcessError as e:
+                    self.logger.error(f"Failed to remove directory {d}: {e.stderr}")
+            else:
+                self.logger.info(f"[DRY RUN] Would remove directory: {d}")
+
+
     def run(self):
         self.logger.info("Smart Emby sync script started")
         
@@ -455,6 +485,8 @@ print(json.dumps(remote_files))
         self.sync_files(local_files, remote_files, renames, dir_renames)
         
         self.cleanup_remote_files(local_files, remote_files, renames, dir_renames)
+
+        self.cleanup_remote_dirs(local_files, remote_files, dir_renames)
         
         self.logger.info("Smart sync completed successfully")
 
