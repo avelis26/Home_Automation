@@ -17,7 +17,7 @@ class EmbySync:
         self.remote_base_path = "/mnt/data/Media"
         self.remote_user = "grace"
         self.remote_host = "embytwo"
-        self.scan_paths = ["Shows", "Movies"]
+        self.scan_paths = ["tmp", "tmp2"]
         self.bandwidth_limit = "666"
         self.exclusions = []
         self.dry_run = False
