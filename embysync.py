@@ -258,6 +258,42 @@ print(json.dumps(remote_files))
         
         return renames
 
+    def detect_directory_renames(self, local_files, remote_files):
+        """Detect when entire directories have been renamed"""
+        dir_renames = {}
+        local_dirs = {}
+        remote_dirs = {}
+        
+        # Group files by directory and create directory signatures
+        for rel_path, info in local_files.items():
+            dir_path = os.path.dirname(rel_path)
+            if dir_path:
+                if dir_path not in local_dirs:
+                    local_dirs[dir_path] = []
+                local_dirs[dir_path].append((os.path.basename(rel_path), info['size']))
+        
+        for rel_path, info in remote_files.items():
+            dir_path = os.path.dirname(rel_path)
+            if dir_path:
+                if dir_path not in remote_dirs:
+                    remote_dirs[dir_path] = []
+                remote_dirs[dir_path].append((os.path.basename(rel_path), info['size']))
+        
+        # Create signatures (sorted list of filename+size tuples)
+        local_signatures = {dir_path: tuple(sorted(files)) for dir_path, files in local_dirs.items()}
+        remote_signatures = {dir_path: tuple(sorted(files)) for dir_path, files in remote_dirs.items()}
+        
+        # Find matching signatures
+        for local_dir, local_sig in local_signatures.items():
+            for remote_dir, remote_sig in remote_signatures.items():
+                if (local_sig == remote_sig and 
+                    local_dir != remote_dir and
+                    os.path.dirname(local_dir) == os.path.dirname(remote_dir)):  # Same parent dir
+                    dir_renames[remote_dir] = local_dir
+                    break
+        
+        return dir_renames
+
     def perform_renames(self, renames):
         if not renames:
             return
@@ -294,13 +330,35 @@ print(json.dumps(remote_files))
                     f"[DRY RUN] Would rename: {old_file_name} -> {new_file_name}"
                 )
 
-    def sync_files(self, local_files, remote_files, renames=None):
+    def perform_directory_renames(self, dir_renames):
+        """Execute directory renames on remote server"""
+        if not dir_renames:
+            return
+            
+        self.logger.info(f"Performing {len(dir_renames)} directory renames on remote...")
+        
+        for old_remote_dir, new_local_dir in dir_renames.items():
+            old_full_path = os.path.join(self.remote_base_path, old_remote_dir)
+            new_full_path = os.path.join(self.remote_base_path, new_local_dir)
+            
+            if not self.dry_run:
+                try:
+                    cmd = f"ssh {self.remote_user}@{self.remote_host} mv '{old_full_path}' '{new_full_path}'"
+                    subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+                    self.logger.info(f"Renamed remote directory: {old_remote_dir} -> {new_local_dir}")
+                except subprocess.CalledProcessError as e:
+                    self.logger.error(f"Failed to rename directory {old_remote_dir}: {e.stderr}")
+            else:
+                self.logger.info(f"[DRY RUN] Would rename directory: {old_remote_dir} -> {new_local_dir}")
+
+    def sync_files(self, local_files, remote_files, renames=None, dir_renames=None):
         self.logger.info(f"Processing {len(local_files)} files...")
         
         renamed_local_files = set(renames.values()) if renames else set()
+        renamed_dirs = set(dir_renames.values()) if dir_renames else set()
         
         for rel_path, local_info in local_files.items():
-            if rel_path in renamed_local_files:
+            if any(rel_path.startswith(renamed_dir + '/') for renamed_dir in renamed_dirs):
                 continue
                 
             file_name = os.path.basename(rel_path)
@@ -337,11 +395,14 @@ print(json.dumps(remote_files))
                     
         self.logger.info("File sync completed successfully")
 
-    def cleanup_remote_files(self, local_files, remote_files, renames=None):
+    def cleanup_remote_files(self, local_files, remote_files, renames=None, dir_renames=None):
+        renamed_dirs = set(dir_renames.keys()) if dir_renames else set()
+        
         files_to_remove = [
             rel_path for rel_path in remote_files 
             if rel_path not in local_files and 
-            (not renames or rel_path not in renames)
+            (not renames or rel_path not in renames) and
+            not any(rel_path.startswith(renamed_dir + '/') for renamed_dir in renamed_dirs)
         ]
         
         if not files_to_remove:
@@ -383,13 +444,17 @@ print(json.dumps(remote_files))
         remote_files = self.scan_remote_files()
         
         renames = self.detect_renames(local_files, remote_files)
+        dir_renames = self.detect_directory_renames(local_files, remote_files)
+        
         self.perform_renames(renames)
+
+        self.perform_directory_renames(dir_renames)
         
         self.ensure_remote_directories(local_files)
         
-        self.sync_files(local_files, remote_files, renames)
+        self.sync_files(local_files, remote_files, renames, dir_renames)
         
-        self.cleanup_remote_files(local_files, remote_files, renames)
+        self.cleanup_remote_files(local_files, remote_files, renames, dir_renames)
         
         self.logger.info("Smart sync completed successfully")
 
