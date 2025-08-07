@@ -3,6 +3,7 @@ import os
 import json
 import subprocess
 import logging
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -128,10 +129,22 @@ print(json.dumps(remote_files))
         remote_script = self._generate_remote_script()
         self.logger.debug(f"Generated remote script:\n{remote_script}")
         
-        # Pipe the Python script to the remote Python interpreter
-        cmd = f"echo '{remote_script}' | ssh {self.remote_user}@{self.remote_host} python3 -"
+        # Create a temporary file for the remote script
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as temp_file:
+            temp_file.write(remote_script)
+            temp_file_path = temp_file.name
+
         try:
+            # Copy the script to the remote server
+            remote_script_path = "/tmp/embysync_remote.py"
+            scp_cmd = f"scp {temp_file_path} {self.remote_user}@{self.remote_host}:{remote_script_path}"
+            subprocess.run(scp_cmd, shell=True, check=True, capture_output=True, text=True)
+
+            # Execute the script on the remote server
+            cmd = f"ssh {self.remote_user}@{self.remote_host} python3 {remote_script_path}"
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
+            
+            # Parse the output
             remote_files = json.loads(result.stdout)
             return remote_files
         except subprocess.CalledProcessError as e:
@@ -140,6 +153,15 @@ print(json.dumps(remote_files))
         except json.JSONDecodeError as e:
             self.logger.error(f"Failed to parse remote file list: {e}")
             return {}
+        finally:
+            # Clean up the temporary file locally
+            os.unlink(temp_file_path)
+            # Clean up the script on the remote server
+            try:
+                cleanup_cmd = f"ssh {self.remote_user}@{self.remote_host} rm -f {remote_script_path}"
+                subprocess.run(cleanup_cmd, shell=True, check=True, capture_output=True, text=True)
+            except subprocess.CalledProcessError as e:
+                self.logger.warning(f"Failed to clean up remote script: {e.stderr}")
 
     def sync_files(self, local_files, remote_files):
         self.logger.info(f"Syncing {len(local_files)} files...")
