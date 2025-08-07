@@ -14,20 +14,18 @@ class EmbySync:
         self.remote_base_path = "/mnt/data/Media"
         self.remote_user = "grace"
         self.remote_host = "embytwo"
-        self.scan_paths = ["tmp", "tmp2"]  # Single source of truth for scan_paths
+        self.scan_paths = ["tmp", "tmp2"]
         self.bandwidth_limit = "4096"  # KB/s
         self.exclusions = []
         self.dry_run = False
-        
+
         # Setup logging
         self.logger = logging.getLogger('EmbySync')
         self.logger.setLevel(logging.INFO)
-        #handler = logging.StreamHandler()
-        #handler = logging.FileHandler('/var/log/emby-sync.log')
         handler = RotatingFileHandler('/var/log/emby-sync.log', maxBytes=10485760, backupCount=5)
         handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         self.logger.addHandler(handler)
-        
+
     def _generate_remote_script(self):
         scan_paths_json = json.dumps(self.scan_paths)
         script = f"""
@@ -161,7 +159,7 @@ print(json.dumps(remote_files))
         directories = set()
         for rel_path in local_files.keys():
             dir_path = os.path.dirname(rel_path)
-            if dir_path:  # Skip if file is in root
+            if dir_path:
                 directories.add(dir_path)
         
         if not directories:
@@ -183,11 +181,10 @@ print(json.dumps(remote_files))
 
     def detect_renames(self, local_files, remote_files):
         """Detect files that have been renamed by matching size and mtime"""
-        renames = {}  # remote_path -> local_path
+        renames = {}
         local_by_signature = {}
         remote_by_signature = {}
         
-        # Create signature maps (size + mtime)
         for rel_path, info in local_files.items():
             signature = (info['size'], int(info['mtime']))
             if signature not in local_by_signature:
@@ -200,16 +197,13 @@ print(json.dumps(remote_files))
                 remote_by_signature[signature] = []
             remote_by_signature[signature].append(rel_path)
         
-        # Find renames (files with same signature but different paths)
         for signature, local_paths in local_by_signature.items():
             if signature in remote_by_signature:
                 remote_paths = remote_by_signature[signature]
-                # Handle simple 1:1 renames
                 if len(local_paths) == 1 and len(remote_paths) == 1:
                     local_path = local_paths[0]
                     remote_path = remote_paths[0]
                     if local_path != remote_path:
-                        # Same directory rename (most common case)
                         if os.path.dirname(local_path) == os.path.dirname(remote_path):
                             renames[remote_path] = local_path
         
@@ -242,11 +236,9 @@ print(json.dumps(remote_files))
     def sync_files(self, local_files, remote_files, renames=None):
         self.logger.info(f"Processing {len(local_files)} files...")
         
-        # Skip files that were renamed
         renamed_local_files = set(renames.values()) if renames else set()
         
         for rel_path, local_info in local_files.items():
-            # Skip files that were handled by rename
             if rel_path in renamed_local_files:
                 continue
                 
@@ -308,7 +300,6 @@ print(json.dumps(remote_files))
         local_files = self.scan_local_files()
         remote_files = self.scan_remote_files()
         
-        # Detect and perform renames first
         renames = self.detect_renames(local_files, remote_files)
         self.perform_renames(renames)
         
