@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# DO NOT FUCKING USE, IT WILL DELETE ALL YOUR FILES!!!!!
+BROKEN
 import os
 import json
 import subprocess
