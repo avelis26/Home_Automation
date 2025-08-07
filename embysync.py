@@ -241,7 +241,7 @@ for rel_scan_path in scan_paths:
 
 print(json.dumps(remote_files))
 '''
-        
+        self.logger.debug(f"Generated remote script:\n{remote_script}")
         cmd = [
             'ssh', f'{self.dest_user}@{self.dest_host}',
             f'python3 -c "{remote_script}"'
