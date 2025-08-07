@@ -153,7 +153,7 @@ print(json.dumps(remote_files))
                 self.logger.warning(f"Failed to clean up remote script: {e.stderr}")
 
     def sync_files(self, local_files, remote_files):
-        self.logger.info(f"Syncing {len(local_files)} files...")
+        self.logger.info(f"Processing {len(local_files)} files...")
         
         for rel_path, local_info in local_files.items():
             file_name = os.path.basename(rel_path)
