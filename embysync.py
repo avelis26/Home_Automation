@@ -157,7 +157,7 @@ print(json.dumps(remote_files))
         
         for rel_path, local_info in local_files.items():
             file_name = os.path.basename(rel_path)
-           /self.logger.info(f"Syncing file: {file_name}")
+            self.logger.info(f"Syncing file: {file_name}")
             local_path = os.path.join(self.local_base_path, rel_path)
             remote_path = os.path.join(self.remote_base_path, rel_path)
             
