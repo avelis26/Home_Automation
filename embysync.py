@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # Made by Graham Pinkston (graham.pinkston@gmail.com) with the help of Claude & Grok (Claude is better)
-# 2025-08-07_04:53
+# 2025-08-07_11:30
 import json
 import logging
 import os
 import subprocess
 import tempfile
 import shlex
+import fcntl
+import sys
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -22,6 +24,8 @@ class EmbySync:
         self.bandwidth_limit = "666"
         self.exclusions = []
         self.dry_run = False
+        self.lock_file = "/var/run/emby-sync.lock"
+        self.lock_fd = None
 
         self.logger = logging.getLogger('EmbySync')
         self.logger.setLevel(logging.INFO)
@@ -34,6 +38,41 @@ class EmbySync:
             logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         )
         self.logger.addHandler(handler)
+
+    def acquire_lock(self):
+        """Acquire exclusive lock to prevent multiple instances"""
+        try:
+            self.lock_fd = open(self.lock_file, 'w')
+            fcntl.flock(self.lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self.lock_fd.write(f"{os.getpid()}\n")
+            self.lock_fd.flush()
+            self.logger.info(f"Acquired lock file: {self.lock_file}")
+            return True
+        except IOError:
+            self.logger.error(f"Another instance is already running (lock file: {self.lock_file})")
+            if self.lock_fd:
+                self.lock_fd.close()
+                self.lock_fd = None
+            return False
+        except Exception as e:
+            self.logger.error(f"Failed to acquire lock: {e}")
+            if self.lock_fd:
+                self.lock_fd.close()
+                self.lock_fd = None
+            return False
+
+    def release_lock(self):
+        """Release the lock file"""
+        if self.lock_fd:
+            try:
+                fcntl.flock(self.lock_fd.fileno(), fcntl.LOCK_UN)
+                self.lock_fd.close()
+                os.unlink(self.lock_file)
+                self.logger.info("Released lock file")
+            except Exception as e:
+                self.logger.error(f"Failed to release lock: {e}")
+            finally:
+                self.lock_fd = None
 
     def _generate_remote_script(self):
         scan_paths_json = json.dumps(self.scan_paths)
@@ -210,7 +249,6 @@ print(json.dumps(remote_files))
             remote_dir = os.path.join(self.remote_base_path, dir_path)
             if not self.dry_run:
                 try:
-                    # Use shlex.quote to properly escape the path
                     escaped_remote_dir = shlex.quote(remote_dir)
                     remote_command = f"mkdir -p {escaped_remote_dir}"
                     cmd = [
@@ -490,33 +528,39 @@ print(json.dumps(remote_files))
             else:
                 self.logger.info(f"[DRY RUN] Would remove directory: {d}")
 
-
     def run(self):
         self.logger.info("Smart Emby sync script started")
         
-        if not self.test_ssh_connection():
-            self.logger.error("Aborting due to SSH connection failure")
-            return
+        if not self.acquire_lock():
+            sys.exit(1)
+        
+        try:
+            if not self.test_ssh_connection():
+                self.logger.error("Aborting due to SSH connection failure")
+                return
+                
+            local_files = self.scan_local_files()
+            remote_files = self.scan_remote_files()
             
-        local_files = self.scan_local_files()
-        remote_files = self.scan_remote_files()
-        
-        renames = self.detect_renames(local_files, remote_files)
-        dir_renames = self.detect_directory_renames(local_files, remote_files)
-        
-        self.perform_renames(renames)
+            renames = self.detect_renames(local_files, remote_files)
+            dir_renames = self.detect_directory_renames(local_files, remote_files)
+            
+            self.perform_renames(renames)
 
-        self.perform_directory_renames(dir_renames)
-        
-        self.ensure_remote_directories(local_files)
-        
-        self.sync_files(local_files, remote_files, renames, dir_renames)
-        
-        self.cleanup_remote_files(local_files, remote_files, renames, dir_renames)
+            self.perform_directory_renames(dir_renames)
+            
+            self.ensure_remote_directories(local_files)
+            
+            self.sync_files(local_files, remote_files, renames, dir_renames)
+            
+            self.cleanup_remote_files(local_files, remote_files, renames, dir_renames)
 
-        self.cleanup_remote_dirs(local_files, remote_files, dir_renames)
-        
-        self.logger.info("Smart sync completed successfully")
+            self.cleanup_remote_dirs(local_files, remote_files, dir_renames)
+            
+            self.logger.info("Smart sync completed successfully")
+            
+        finally:
+            self.release_lock()
 
 
 if __name__ == "__main__":
@@ -525,5 +569,6 @@ if __name__ == "__main__":
         sync.run()
     except Exception as e:
         sync.logger.error(f"Sync failed: {str(e)}")
+        sync.release_lock()
     finally:
         sync.logger.info("Sync process ended")
