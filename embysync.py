@@ -16,8 +16,9 @@ class SmartEmbySync:
     def __init__(self):
         # Specify only the folders you want to sync
         self.source_paths = [
-            "/mnt/data/Media/Movies",
-            "/mnt/data/Media/Shows"
+            #"/mnt/data/Media/Movies",
+            #"/mnt/data/Media/Shows",
+            "/mnt/data/Media/tmp"
         ]
         self.dest_user = "grace"
         self.dest_host = "embytwo"
