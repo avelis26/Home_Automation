@@ -25,7 +25,6 @@ class EmbySync:
         self.logger.addHandler(handler)
         
     def _generate_remote_script(self):
-        # Convert self.scan_paths to a JSON string to safely embed in the remote script
         scan_paths_json = json.dumps(self.scan_paths)
         script = f"""
 import os
@@ -44,14 +43,12 @@ for rel_scan_path in scan_paths:
         
     for root, dirs, files in os.walk(full_scan_path):
         for file in files:
-            # Skip hidden files and system files
             if file.startswith('.'):
                 continue
                 
             file_path = os.path.join(root, file)
             rel_path = os.path.relpath(file_path, base_path)
             
-            # Skip excluded files
             if any(excl in rel_path for excl in exclusions):
                 continue
             
@@ -101,14 +98,12 @@ print(json.dumps(remote_files))
                 
             for root, dirs, files in os.walk(full_scan_path):
                 for file in files:
-                    # Skip hidden files and system files
                     if file.startswith('.'):
                         continue
                         
                     file_path = os.path.join(root, file)
                     rel_path = os.path.relpath(file_path, self.local_base_path)
                     
-                    # Skip excluded files
                     if any(excl in rel_path for excl in self.exclusions):
                         continue
                         
@@ -129,22 +124,18 @@ print(json.dumps(remote_files))
         remote_script = self._generate_remote_script()
         self.logger.debug(f"Generated remote script:\n{remote_script}")
         
-        # Create a temporary file for the remote script
         with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as temp_file:
             temp_file.write(remote_script)
             temp_file_path = temp_file.name
 
         try:
-            # Copy the script to the remote server
             remote_script_path = "/tmp/embysync_remote.py"
             scp_cmd = f"scp {temp_file_path} {self.remote_user}@{self.remote_host}:{remote_script_path}"
             subprocess.run(scp_cmd, shell=True, check=True, capture_output=True, text=True)
 
-            # Execute the script on the remote server
             cmd = f"ssh {self.remote_user}@{self.remote_host} python3 {remote_script_path}"
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
             
-            # Parse the output
             remote_files = json.loads(result.stdout)
             return remote_files
         except subprocess.CalledProcessError as e:
@@ -154,9 +145,7 @@ print(json.dumps(remote_files))
             self.logger.error(f"Failed to parse remote file list: {e}")
             return {}
         finally:
-            # Clean up the temporary file locally
             os.unlink(temp_file_path)
-            # Clean up the script on the remote server
             try:
                 cleanup_cmd = f"ssh {self.remote_user}@{self.remote_host} rm -f {remote_script_path}"
                 subprocess.run(cleanup_cmd, shell=True, check=True, capture_output=True, text=True)
@@ -167,11 +156,11 @@ print(json.dumps(remote_files))
         self.logger.info(f"Syncing {len(local_files)} files...")
         
         for rel_path, local_info in local_files.items():
-            self.logger.info(f"Syncing {len(local_files)} files from {self.local_base_path}")
+            file_name = os.path.basename(rel_path)
+           /self.logger.info(f"Syncing file: {file_name}")
             local_path = os.path.join(self.local_base_path, rel_path)
             remote_path = os.path.join(self.remote_base_path, rel_path)
             
-            # Check if file needs syncing
             needs_sync = True
             if rel_path in remote_files:
                 remote_info = remote_files[rel_path]
@@ -185,9 +174,9 @@ print(json.dumps(remote_files))
                         cmd = f"rsync -av --progress '{local_path}' {self.remote_user}@{self.remote_host}:'{remote_path}'"
                         subprocess.run(cmd, shell=True, check=True)
                     except subprocess.CalledProcessError as e:
-                        self.logger.error(f"Failed to sync {rel_path}: {e.stderr}")
+                        self.logger.error(f"Failed to sync {file_name}: {e.stderr}")
                 else:
-                    self.logger.info(f"[DRY RUN] Would sync: {rel_path}")
+                    self.logger.info(f"[DRY RUN] Would sync: {file_name}")
                     
         self.logger.info("File sync completed successfully")
 
@@ -201,33 +190,30 @@ print(json.dumps(remote_files))
         self.logger.info(f"Removing {len(files_to_remove)} extra files from remote...")
         
         for rel_path in files_to_remove:
+            file_name = os.path.basename(rel_path)
             remote_path = os.path.join(self.remote_base_path, rel_path)
             if not self.dry_run:
                 try:
                     cmd = f"ssh {self.remote_user}@{self.remote_host} rm -f '{remote_path}'"
                     subprocess.run(cmd, shell=True, check=True)
-                    self.logger.info(f"Removed remote file: {rel_path}")
+                    self.logger.info(f"Removed remote file: {file_name}")
                 except subprocess.CalledProcessError as e:
-                    self.logger.error(f"Failed to remove {rel_path}: {e.stderr}")
+                    self.logger.error(f"Failed to remove {file_name}: {e.stderr}")
             else:
-                self.logger.info(f"[DRY RUN] Would remove: {rel_path}")
+                self.logger.info(f"[DRY RUN] Would remove: {file_name}")
 
     def run(self):
         self.logger.info("Smart Emby sync script started")
         
-        # Test SSH connection
         if not self.test_ssh_connection():
             self.logger.error("Aborting due to SSH connection failure")
             return
             
-        # Scan files
         local_files = self.scan_local_files()
         remote_files = self.scan_remote_files()
         
-        # Sync files
         self.sync_files(local_files, remote_files)
         
-        # Cleanup extra files on remote
         self.cleanup_remote_files(local_files, remote_files)
         
         self.logger.info("Smart sync completed successfully")
