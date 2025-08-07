@@ -162,11 +162,11 @@ class SmartEmbySync:
                     file_path = os.path.join(root, file)
                     # Calculate relative path from /mnt/data/Media base
                     rel_path = os.path.relpath(file_path, "/mnt/data/Media")
-                        
+                    
                     # Skip excluded files
                     if any(excl in rel_path for excl in self.exclusions):
                         continue
-                        
+                    
                     try:
                         stat_info = os.stat(file_path)
                         file_info = {
@@ -175,7 +175,7 @@ class SmartEmbySync:
                             'mtime': stat_info.st_mtime,
                             'hash': None
                         }
-                            
+                        
                         # Get hash for large files
                         if stat_info.st_size >= self.min_file_size:
                             file_hash = self.get_file_hash_sample(file_path)
@@ -184,7 +184,7 @@ class SmartEmbySync:
                                 hash_to_files[file_hash].append(rel_path)
                         
                         local_files[rel_path] = file_info
-                            
+                        
                     except Exception as e:
                         self.logger.warning(f"Could not stat {file_path}: {e}")
         
