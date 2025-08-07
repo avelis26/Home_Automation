@@ -156,6 +156,31 @@ print(json.dumps(remote_files))
             except subprocess.CalledProcessError as e:
                 self.logger.warning(f"Failed to clean up remote script: {e.stderr}")
 
+    def ensure_remote_directories(self, local_files):
+        """Create necessary directories on remote server"""
+        directories = set()
+        for rel_path in local_files.keys():
+            dir_path = os.path.dirname(rel_path)
+            if dir_path:  # Skip if file is in root
+                directories.add(dir_path)
+        
+        if not directories:
+            return
+            
+        self.logger.info(f"Ensuring {len(directories)} remote directories exist...")
+        
+        for dir_path in directories:
+            remote_dir = os.path.join(self.remote_base_path, dir_path)
+            if not self.dry_run:
+                try:
+                    cmd = f"ssh {self.remote_user}@{self.remote_host} mkdir -p '{remote_dir}'"
+                    subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+                    self.logger.debug(f"Created remote directory: {dir_path}")
+                except subprocess.CalledProcessError as e:
+                    self.logger.error(f"Failed to create remote directory {dir_path}: {e.stderr}")
+            else:
+                self.logger.info(f"[DRY RUN] Would create directory: {dir_path}")
+
     def sync_files(self, local_files, remote_files):
         self.logger.info(f"Processing {len(local_files)} files...")
         
@@ -215,6 +240,8 @@ print(json.dumps(remote_files))
             
         local_files = self.scan_local_files()
         remote_files = self.scan_remote_files()
+        
+        self.ensure_remote_directories(local_files)
         
         self.sync_files(local_files, remote_files)
         
