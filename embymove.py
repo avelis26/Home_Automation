@@ -11,14 +11,14 @@ from datetime import datetime
 from tzlocal import get_localzone
 
 # Configure logging with local timezone
-local_tz = get_localzone()
+#local_tz = get_localzone()
 formatter = logging.Formatter(fmt='%(asctime)s - %(message)s', datefmt='%Y%m%d_%H%M')
-formatter.converter = lambda *args: datetime.now(local_tz).timetuple()
+#formatter.converter = lambda *args: datetime.now(local_tz).timetuple()
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.handlers = []
-file_handler = logging.FileHandler('/var/log/embymove.log')
+file_handler = logging.FileHandler('embymove.log')
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
