@@ -8,7 +8,7 @@ import logging
 import json
 import hashlib
 import signal
-import shutil
+#import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
@@ -43,6 +43,7 @@ class EmbySync:
     def __init__(self, config_path: str = "./embysyncconfig.json"):
         self.config_path = config_path
         self.config = self._load_config()
+        self.ignore_state_file = self.config.get("ignore_state_file", False)
         self.lock_file = "/tmp/emby-sync.lock"
         self.running = True
         self.throttle = NetworkThrottle(self.config["bandwidth_limit_bps"])
@@ -106,6 +107,9 @@ class EmbySync:
 
     def _load_state(self) -> Dict:
         """Load sync state from JSON file"""
+        if self.ignore_state_file:
+            self.logger.info("Ignoring state file per config setting.")
+            return {}
         default_state = {
             "last_sync_time": None,
             "current_directory": None,
@@ -124,6 +128,9 @@ class EmbySync:
 
     def _save_state(self):
         """Save current sync state to JSON file"""
+        if self.ignore_state_file:
+            self.logger.info("Skipping state file save per config setting.")
+            return
         try:
             with open(self.state_file, 'w') as f:
                 json.dump(self.state, f, indent=4)
