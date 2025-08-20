@@ -108,8 +108,9 @@ class EmbySync:
     def _load_state(self) -> Dict:
         """Load sync state from JSON file"""
         if self.ignore_state_file:
+            # Return a minimal valid state so script logic doesn't break
             self.logger.info("Ignoring state file per config setting.")
-            return {}
+            return {"completed_directories": []}
         default_state = {
             "last_sync_time": None,
             "current_directory": None,
@@ -128,8 +129,9 @@ class EmbySync:
 
     def _save_state(self):
         """Save current sync state to JSON file"""
+        # Don't update the state file if igore_state_file flag is true
         if self.ignore_state_file:
-            self.logger.info("Skipping state file save per config setting.")
+            self.logger.info("Skipping state file update per config setting.")
             return
         try:
             with open(self.state_file, 'w') as f:
