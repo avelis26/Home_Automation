@@ -184,6 +184,7 @@ class EmbySync:
 
     def _create_lock(self):
         """Create lock file with current PID and start time"""
+        self.logger.info(f"Creating lock file.")
         lock_data = {
             'pid': os.getpid(),
             'start_time': datetime.now().isoformat(),
