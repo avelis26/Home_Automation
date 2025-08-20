@@ -9,6 +9,7 @@
     "dest_base_path": "/mnt/data/Media",
     "state_file": "./embysync_state.json",
     "log_file": "/var/log/emby-sync.log",
+    "ignore_state_file": false,
     "log_level": "DEBUG",
     "bandwidth_limit_kbps": 500,
     "bandwidth_limit_bps": 512000,
