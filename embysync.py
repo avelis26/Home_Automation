@@ -247,18 +247,31 @@ class EmbySync:
             self.logger.error(f"SSH test failed: {e}")
             return False
 
-    def _get_file_hash(self, file_path: str) -> Optional[str]:
-        """Calculate MD5 hash of a file"""
+    def _get_file_hash(self, file_path: str, chunk_size: int = 65536) -> Optional[str]:
+        """Calculate a partial MD5 hash using the first and last chunk_size bytes of a file."""
         try:
+            file_size = os.path.getsize(file_path)
             hash_md5 = hashlib.md5()
+            
             with open(file_path, "rb") as f:
-                # Read in chunks to handle large files
-                for chunk in iter(lambda: f.read(8192), b""):
-                    hash_md5.update(chunk)
+                # Read first chunk
+                hash_md5.update(f.read(chunk_size))
+                
+                if file_size > chunk_size * 2:
+                    # Seek to last chunk and read
+                    f.seek(-chunk_size, os.SEEK_END)
+                    hash_md5.update(f.read(chunk_size))
+                else:
+                    # File is small; hash the entire file
+                    f.seek(0)
+                    hash_md5.update(f.read())
+            
             return hash_md5.hexdigest()
+        
         except Exception as e:
             self.logger.debug(f"Could not hash file {file_path}: {e}")
             return None
+
 
     def _check_remote_file_exists(self, remote_path: str) -> Tuple[bool, Optional[int]]:
         """Check if a file exists on remote host and get its size"""
@@ -292,20 +305,23 @@ class EmbySync:
         
         try:
             # Get all files in source directory
-            source_files = {}
+            # Get all files in source directory
+            source_files: Dict[str, List[str]] = {}
             for root, dirs, files in os.walk(source_dir):
                 if not self.running:
                     break
-                    
+
                 for file in files:
                     file_path = os.path.join(root, file)
                     rel_path = os.path.relpath(file_path, source_dir)
                     file_hash = self._get_file_hash(file_path)
                     if file_hash:
-                        source_files[file_hash] = rel_path
+                        # store all relative paths for the same hash
+                        source_files.setdefault(file_hash, []).append(rel_path)
+
             
             # Check for matching files in destination with different names
-            dest_full_path = f"{self.config['dest_base_path']}/{os.path.basename(dest_dir)}"
+            dest_full_path = f"{self.config['dest_base_path']}/{os.path.relpath(dest_dir, source_dir)}"
             
             # Get list of destination files
             cmd = [
@@ -345,8 +361,8 @@ class EmbySync:
                         dest_hash = hash_result.stdout.strip()
                         
                         if dest_hash in source_files and dest_hash != "ERROR":
-                            # Found a rename!
-                            source_rel = source_files[dest_hash]
+                            # pick the first matching relative path
+                            source_rel = source_files[dest_hash][0]
                             self.logger.info(f"Detected rename: {rel_dest} -> {source_rel}")
                             renames.append((dest_file, source_rel))
             
