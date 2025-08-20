@@ -400,6 +400,7 @@ class EmbySync:
         cmd = [
             'rsync',
             '-avh',
+            "--checksum",
             '--progress',
             '--delete',
             f'--bwlimit={self.config["bandwidth_limit_kbps"]}',
