@@ -129,7 +129,7 @@ class EmbySync:
 
     def _save_state(self):
         """Save current sync state to JSON file"""
-        # Don't update the state file if igore_state_file flag is true
+        # Don't update the state file if ignore_state_file flag is true
         if self.ignore_state_file:
             self.logger.info("Skipping state file update per config setting.")
             return
