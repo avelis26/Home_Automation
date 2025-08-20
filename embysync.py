@@ -110,7 +110,12 @@ class EmbySync:
         if self.ignore_state_file:
             # Return a minimal valid state so script logic doesn't break
             self.logger.info("Ignoring state file per config setting.")
-            return {"completed_directories": []}
+            return {
+                "last_sync_time": None,
+                "current_directory": None,
+                "completed_directories": [],
+                "failed_directories": []
+            }
         default_state = {
             "last_sync_time": None,
             "current_directory": None,
