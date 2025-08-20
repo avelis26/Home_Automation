@@ -55,7 +55,7 @@ class EmbySync:
         self._setup_logging()
         
         # Create state file for tracking progress
-        self.state_file = "./embysync_state.json"
+        self.state_file = self.config.get("state_file", "./embysync_state.json")
         self.state = self._load_state()
 
     def _signal_handler(self, signum, frame):
@@ -584,7 +584,7 @@ class EmbySync:
 
 if __name__ == "__main__":
     try:
-        config_path = "./embysyncconfig.json"
+        config_path = "./embysyncconfig_test.json"
         if len(sys.argv) > 1:
             config_path = sys.argv[1]
         

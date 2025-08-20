@@ -1,14 +1,13 @@
 {
     "source_paths": [
-        "/mnt/data/Media/Movies",
-        "/mnt/data/Media/Shows",
-        "/mnt/data/Media/Sports/NFL/Seahawks_2025"
+        "/mnt/data/Media/tmp",
+        "/mnt/data/Media/tmp2"
     ],
     "dest_user": "grace",
     "dest_host": "embytwo",
     "dest_base_path": "/mnt/data/Media",
-    "state_file": "./embysync_state.json",
-    "log_file": "/var/log/emby-sync.log",
+    "state_file": "./embysync_state_test.json",
+    "log_file": "/var/log/emby-sync_test.log",
     "log_level": "DEBUG",
     "bandwidth_limit_kbps": 500,
     "bandwidth_limit_bps": 512000,
