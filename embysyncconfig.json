@@ -1,0 +1,19 @@
+{
+    "source_paths": [
+        "/mnt/data/Media/Movies",
+        "/mnt/data/Media/Shows",
+        "/mnt/data/Media/Sports/NFL/Seahawks_2025"
+    ],
+    "dest_user": "grace",
+    "dest_host": "embytwo",
+    "dest_base_path": "/mnt/data/Media",
+    "log_file": "/var/log/emby-sync.log",
+    "log_level": "DEBUG",
+    "bandwidth_limit_kbps": 500,
+    "bandwidth_limit_bps": 512000,
+    "max_retries": 3,
+    "retry_delay": 60,
+    "ssh_timeout": 30,
+    "rsync_partial": true,
+    "rsync_compress": true
+}
