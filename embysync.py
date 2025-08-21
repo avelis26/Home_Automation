@@ -298,13 +298,13 @@ class EmbySync:
             self.logger.debug(f"Error checking remote file {remote_path}: {e}")
             return False, None
 
-    def _detect_renames(self, source_dir: str, dest_dir: str) -> List[Tuple[str, str]]:
+    def _detect_renames(self, source_dir: str, dest_full_path: str) -> List[Tuple[str, str]]:
         """Detect renamed files by comparing content hashes"""
         self.logger.debug(f"Detecting renames in {source_dir}")
+        self.logger.debug(f"Checking destination path: {dest_full_path}")
         renames = []
         
         try:
-            # Get all files in source directory
             # Get all files in source directory
             source_files: Dict[str, List[str]] = {}
             for root, dirs, files in os.walk(source_dir):
@@ -321,8 +321,6 @@ class EmbySync:
 
             
             # Check for matching files in destination with different names
-            dest_full_path = f"{self.config['dest_base_path']}/{os.path.relpath(dest_dir, source_dir)}"
-            
             # Get list of destination files
             cmd = [
                 'ssh', '-o', 'BatchMode=yes',
@@ -335,6 +333,7 @@ class EmbySync:
             if result.returncode == 0:
                 dest_files = result.stdout.strip().split('\n')
                 dest_files = [f for f in dest_files if f.strip()]
+                self.logger.debug(f"Found {len(dest_files)} files in destination directory")
                 
                 for dest_file in dest_files:
                     if not self.running:
@@ -422,7 +421,7 @@ class EmbySync:
         dest_full_path = f"{self.config['dest_base_path']}/{'/'.join(path_parts[media_index+1:])}"
         
         # Detect and handle renames first
-        renames = self._detect_renames(source_path, destination_path.split(':')[1])
+        renames = self._detect_renames(source_path, dest_full_path)
         if renames:
             self._handle_renames(renames, self.config['dest_base_path'])
         
