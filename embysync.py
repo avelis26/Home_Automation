@@ -288,10 +288,6 @@ class EmbySync:
         """Detect if source directory might be a renamed version of an existing destination directory"""
         self.logger.debug(f"Checking for directory renames for: {os.path.basename(source_dir)}")
         
-        #if self.dry_run:
-        #    self.logger.info(f"[DRY RUN] Would check for directory renames for: {os.path.basename(source_dir)}")
-        #    return None
-        
         # Get the parent directory path on destination
         dest_parent = os.path.dirname(dest_full_path)
         
@@ -467,10 +463,6 @@ class EmbySync:
         """Detect renamed files by comparing content hashes"""
         self.logger.debug(f"Detecting renames in {source_dir}")
         self.logger.debug(f"Checking destination path: {dest_full_path}")
-        
-        #if self.dry_run:
-        #    self.logger.info(f"[DRY RUN] Would detect renames in: {source_dir}")
-        #    return []
             
         renames = []
         
@@ -595,10 +587,6 @@ class EmbySync:
         dest_full_path = f"{self.config['dest_base_path']}/{'/'.join(path_parts[media_index+1:])}"
         
         # Check if destination directory exists, if not, look for potential renames
-        #if self.dry_run:
-        #    self.logger.info(f"[DRY RUN] Would check if destination exists: {dest_full_path}")
-        #    dest_exists = False
-        #else:
         exists_cmd = [
             'ssh', '-o', 'BatchMode=yes',
             f"{self.config['dest_user']}@{self.config['dest_host']}",
