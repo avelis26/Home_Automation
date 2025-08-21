@@ -1,0 +1,20 @@
+{
+    "source_paths": [
+        "/mnt/data/Media/tmp",
+        "/mnt/data/Media/tmp2"
+    ],
+    "dest_user": "grace",
+    "dest_host": "embytwo",
+    "dest_base_path": "/mnt/data/Media",
+    "state_file": "./embysync_state_test.json",
+    "log_file": "/var/log/emby-sync_test.log",
+    "ignore_state_file": true,
+    "log_level": "DEBUG",
+    "bandwidth_limit_kbps": 500,
+    "bandwidth_limit_bps": 512000,
+    "max_retries": 3,
+    "retry_delay": 60,
+    "ssh_timeout": 30,
+    "rsync_partial": true,
+    "rsync_compress": true
+}
