@@ -248,23 +248,13 @@ class EmbySync:
             return False
 
     def _get_file_hash(self, file_path: str, chunk_size: int = 65536) -> Optional[str]:
-        """Calculate a partial MD5 hash using the first and last chunk_size bytes of a file."""
+        """Calculate MD5 hash of entire file (matching remote md5sum behavior)."""
         try:
-            file_size = os.path.getsize(file_path)
             hash_md5 = hashlib.md5()
             
             with open(file_path, "rb") as f:
-                # Read first chunk
-                hash_md5.update(f.read(chunk_size))
-                
-                if file_size > chunk_size * 2:
-                    # Seek to last chunk and read
-                    f.seek(-chunk_size, os.SEEK_END)
-                    hash_md5.update(f.read(chunk_size))
-                else:
-                    # File is small; hash the entire file
-                    f.seek(0)
-                    hash_md5.update(f.read())
+                for chunk in iter(lambda: f.read(chunk_size), b""):
+                    hash_md5.update(chunk)
             
             return hash_md5.hexdigest()
         
