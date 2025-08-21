@@ -8,7 +8,6 @@ import logging
 import json
 import hashlib
 import signal
-#import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
@@ -360,13 +359,13 @@ class EmbySync:
         
         return renames
 
-    def _handle_renames(self, renames: List[Tuple[str, str]], dest_base: str):
+    def _handle_renames(self, renames: List[Tuple[str, str]], dest_full_path: str):
         """Handle detected file renames on destination"""
         for old_path, new_rel_path in renames:
             if not self.running:
                 break
                 
-            new_path = f"{dest_base}/{new_rel_path}"
+            new_path = f"{dest_full_path}/{new_rel_path}"
             
             # Create destination directory if needed
             new_dir = os.path.dirname(new_path)
@@ -413,7 +412,7 @@ class EmbySync:
         # Detect and handle renames first
         renames = self._detect_renames(source_path, dest_full_path)
         if renames:
-            self._handle_renames(renames, self.config['dest_base_path'])
+            self._handle_renames(renames, dest_full_path)
         
         # Build rsync command
         cmd = [
