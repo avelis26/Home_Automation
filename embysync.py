@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-# DRY RUN NOT WORKING
-# Possible failure to delete old dir's
 
 import os
 import sys
@@ -833,7 +831,7 @@ class EmbySync:
 
 if __name__ == "__main__":
     try:
-        config_path = "./embysyncconfig_test.json"
+        config_path = "./embysyncconfig.json"
         dry_run = False
         
         # Parse command line arguments
