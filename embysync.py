@@ -321,7 +321,7 @@ class EmbySync:
                     similarity = self._get_directory_similarity(source_basename, dest_dir)
                     self.logger.debug(f"Similarity between '{source_basename}' and '{os.path.basename(dest_dir)}': {similarity:.2f}")
                     
-                    if similarity > best_similarity and similarity >= 0.7:  # 70% similarity threshold
+                    if similarity > best_similarity and similarity >= 0.69:  # 70% similarity threshold
                         best_similarity = similarity
                         best_match = dest_dir
                 
