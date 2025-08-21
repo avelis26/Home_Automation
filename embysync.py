@@ -248,6 +248,21 @@ class EmbySync:
             self.logger.error(f"SSH test failed: {e}")
             return False
 
+    def _get_file_hash(self, file_path: str, chunk_size: int = 65536) -> Optional[str]:
+        """Calculate MD5 hash of entire file (matching remote md5sum behavior)."""
+        try:
+            hash_md5 = hashlib.md5()
+            
+            with open(file_path, "rb") as f:
+                for chunk in iter(lambda: f.read(chunk_size), b""):
+                    hash_md5.update(chunk)
+            
+            return hash_md5.hexdigest()
+        
+        except Exception as e:
+            self.logger.debug(f"Could not hash file {file_path}: {e}")
+            return None
+
     def _get_directory_similarity(self, dir1: str, dir2: str) -> float:
         """Calculate similarity ratio between two directory names"""
         # Extract just the directory names, not full paths
