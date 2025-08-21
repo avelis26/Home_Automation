@@ -1,24 +1,6 @@
 {
     "last_sync_time": null,
-    "current_directory": "/mnt/data/Media/Movies/A_Babysitter's_Guide_to_Monster_Hunting_(2020)_[624963]",
-    "completed_directories": [
-        "/mnt/data/Media/Movies/100%_Wolf_(2020)_[520946]",
-        "/mnt/data/Media/Movies/10_Lives_(2024)_[567811]",
-        "/mnt/data/Media/Movies/13_Hours_-_The_Secret_Soldiers_of_Benghazi_(2016)_[300671]",
-        "/mnt/data/Media/Movies/200%_Wolf_(2024)_[974663]",
-        "/mnt/data/Media/Movies/2001_-_A_Space_Odyssey_(1968)_[62]",
-        "/mnt/data/Media/Movies/2012_-_Ice_Age_(2011)_[59722]",
-        "/mnt/data/Media/Movies/21_Jump_Street_(2012)_[64688]",
-        "/mnt/data/Media/Movies/22_Jump_Street_(2014)_[187017]",
-        "/mnt/data/Media/Movies/22_vs._Earth_(2021)_[811367]",
-        "/mnt/data/Media/Movies/28_Years_Later_(2025)_[1100988]",
-        "/mnt/data/Media/Movies/300_(2007)_[1271]",
-        "/mnt/data/Media/Movies/30_Minutes_or_Less_(2011)_[62206]",
-        "/mnt/data/Media/Movies/3_Ninjas_(1992)_[16314]",
-        "/mnt/data/Media/Movies/6_Underground_(2019)_[509967]",
-        "/mnt/data/Media/Movies/8-Bit_Christmas_(2021)_[802217]",
-        "/mnt/data/Media/Movies/9_(2009)_[12244]",
-        "/mnt/data/Media/Movies/AVP_-_Alien_vs._Predator_(2004)_[395]"
-    ],
+    "current_directory": "",
+    "completed_directories": [],
     "failed_directories": []
 }
