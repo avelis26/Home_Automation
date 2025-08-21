@@ -41,8 +41,9 @@ class NetworkThrottle:
             self.transferred = 0
 
 class EmbySync:
-    def __init__(self, config_path: str = "./embysyncconfig.json"):
+    def __init__(self, config_path: str = "./embysyncconfig.json", dry_run: bool = False):
         self.config_path = config_path
+        self.dry_run = dry_run
         self.config = self._load_config()
         self.ignore_state_file = self.config.get("ignore_state_file", False)
         self.lock_file = "/tmp/emby-sync.lock"
@@ -108,9 +109,9 @@ class EmbySync:
 
     def _load_state(self) -> Dict:
         """Load sync state from JSON file"""
-        if self.ignore_state_file:
+        if self.ignore_state_file or self.dry_run:
             # Return a minimal valid state so script logic doesn't break
-            self.logger.info("Ignoring state file per config setting.")
+            self.logger.info("Ignoring state file per config setting or dry run mode.")
             return {
                 "last_sync_time": None,
                 "current_directory": None,
@@ -135,9 +136,9 @@ class EmbySync:
 
     def _save_state(self):
         """Save current sync state to JSON file"""
-        # Don't update the state file if ignore_state_file flag is true
-        if self.ignore_state_file:
-            self.logger.debug("Skipping state file update per config setting.")
+        # Don't update the state file if ignore_state_file flag is true or in dry run mode
+        if self.ignore_state_file or self.dry_run:
+            self.logger.debug("Skipping state file update per config setting or dry run mode.")
             return
         try:
             with open(self.state_file, 'w') as f:
@@ -155,16 +156,17 @@ class EmbySync:
             datefmt='%Y-%m-%d %H:%M:%S'
         )
         
-        # Setup file handler
-        file_handler = logging.FileHandler(self.config["log_file"])
-        file_handler.setFormatter(formatter)
+        # Setup file handler (skip in dry run mode to avoid writing to actual log file)
+        handlers = []
+        if not self.dry_run:
+            file_handler = logging.FileHandler(self.config["log_file"])
+            file_handler.setFormatter(formatter)
+            handlers.append(file_handler)
         
-        # Setup console handler (only if not running from cron)
-        handlers = [file_handler]
-        if os.isatty(sys.stdout.fileno()):
-            console_handler = logging.StreamHandler()
-            console_handler.setFormatter(formatter)
-            handlers.append(console_handler)
+        # Setup console handler (always enabled for dry run to show output)
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        handlers.append(console_handler)
         
         logging.basicConfig(
             level=log_level,
@@ -176,6 +178,10 @@ class EmbySync:
 
     def _check_lock(self) -> bool:
         """Check for existing lock file and running process"""
+        if self.dry_run:
+            self.logger.info("[DRY RUN] Skipping lock file check")
+            return True
+            
         if os.path.exists(self.lock_file):
             try:
                 with open(self.lock_file, 'r') as f:
@@ -199,6 +205,10 @@ class EmbySync:
 
     def _create_lock(self):
         """Create lock file with current PID and start time"""
+        if self.dry_run:
+            self.logger.info("[DRY RUN] Would create lock file")
+            return
+            
         self.logger.info(f"Creating lock file.")
         lock_data = {
             'pid': os.getpid(),
@@ -211,6 +221,10 @@ class EmbySync:
 
     def _remove_lock(self):
         """Remove lock file"""
+        if self.dry_run:
+            self.logger.info("[DRY RUN] Would remove lock file")
+            return
+            
         try:
             os.remove(self.lock_file)
         except FileNotFoundError:
@@ -219,6 +233,10 @@ class EmbySync:
     def _test_ssh_connection(self) -> bool:
         """Test SSH connection to destination host"""
         self.logger.info(f"Testing SSH connection to {self.config['dest_host']}...")
+        
+        if self.dry_run:
+            self.logger.info("[DRY RUN] Skipping SSH connection test (assuming success)")
+            return True
         
         cmd = [
             'ssh', '-o', 'ConnectTimeout=10', '-o', 'BatchMode=yes',
@@ -276,6 +294,10 @@ class EmbySync:
         """Detect if source directory might be a renamed version of an existing destination directory"""
         self.logger.debug(f"Checking for directory renames for: {os.path.basename(source_dir)}")
         
+        if self.dry_run:
+            self.logger.info(f"[DRY RUN] Would check for directory renames for: {os.path.basename(source_dir)}")
+            return None
+        
         # Get the parent directory path on destination
         dest_parent = os.path.dirname(dest_full_path)
         
@@ -324,6 +346,10 @@ class EmbySync:
 
     def _verify_directory_content_similarity(self, source_dir: str, dest_dir: str) -> bool:
         """Verify that two directories contain similar content (file count and total size check)"""
+        if self.dry_run:
+            self.logger.info(f"[DRY RUN] Would verify content similarity between {source_dir} and {dest_dir}")
+            return True
+            
         try:
             # Get source directory stats
             source_files = []
@@ -384,6 +410,10 @@ class EmbySync:
         """Rename directory on destination"""
         self.logger.info(f"DIRECTORY RENAME: {old_dest_path} -> {new_dest_path}")
         
+        if self.dry_run:
+            self.logger.info(f"[DRY RUN] Would rename directory: {old_dest_path} -> {new_dest_path}")
+            return True
+        
         # Create parent directory if needed
         parent_dir = os.path.dirname(new_dest_path)
         mkdir_cmd = [
@@ -409,23 +439,13 @@ class EmbySync:
         else:
             self.logger.error(f"Failed to rename directory: {result.stderr}")
             return False
-        """Calculate MD5 hash of entire file (matching remote md5sum behavior)."""
-        try:
-            hash_md5 = hashlib.md5()
-            
-            with open(file_path, "rb") as f:
-                for chunk in iter(lambda: f.read(chunk_size), b""):
-                    hash_md5.update(chunk)
-            
-            return hash_md5.hexdigest()
-        
-        except Exception as e:
-            self.logger.debug(f"Could not hash file {file_path}: {e}")
-            return None
-
 
     def _check_remote_file_exists(self, remote_path: str) -> Tuple[bool, Optional[int]]:
         """Check if a file exists on remote host and get its size"""
+        if self.dry_run:
+            self.logger.debug(f"[DRY RUN] Would check if remote file exists: {remote_path}")
+            return False, None
+            
         cmd = [
             'ssh', '-o', 'ConnectTimeout=10', '-o', 'BatchMode=yes',
             f"{self.config['dest_user']}@{self.config['dest_host']}",
@@ -453,6 +473,11 @@ class EmbySync:
         """Detect renamed files by comparing content hashes"""
         self.logger.debug(f"Detecting renames in {source_dir}")
         self.logger.debug(f"Checking destination path: {dest_full_path}")
+        
+        if self.dry_run:
+            self.logger.info(f"[DRY RUN] Would detect renames in: {source_dir}")
+            return []
+            
         renames = []
         
         try:
@@ -529,6 +554,10 @@ class EmbySync:
                 
             new_path = f"{dest_full_path}/{new_rel_path}"
             
+            if self.dry_run:
+                self.logger.info(f"[DRY RUN] Would rename: {old_path} -> {new_path}")
+                continue
+            
             # Create destination directory if needed
             new_dir = os.path.dirname(new_path)
             mkdir_cmd = [
@@ -572,17 +601,21 @@ class EmbySync:
         dest_full_path = f"{self.config['dest_base_path']}/{'/'.join(path_parts[media_index+1:])}"
         
         # Check if destination directory exists, if not, look for potential renames
-        exists_cmd = [
-            'ssh', '-o', 'BatchMode=yes',
-            f"{self.config['dest_user']}@{self.config['dest_host']}",
-            f'test -d "{dest_full_path}" && echo "EXISTS" || echo "MISSING"'
-        ]
-        
-        try:
-            result = subprocess.run(exists_cmd, capture_output=True, timeout=15, text=True)
-            dest_exists = result.stdout.strip() == "EXISTS"
-        except Exception:
+        if self.dry_run:
+            self.logger.info(f"[DRY RUN] Would check if destination exists: {dest_full_path}")
             dest_exists = False
+        else:
+            exists_cmd = [
+                'ssh', '-o', 'BatchMode=yes',
+                f"{self.config['dest_user']}@{self.config['dest_host']}",
+                f'test -d "{dest_full_path}" && echo "EXISTS" || echo "MISSING"'
+            ]
+            
+            try:
+                result = subprocess.run(exists_cmd, capture_output=True, timeout=15, text=True)
+                dest_exists = result.stdout.strip() == "EXISTS"
+            except Exception:
+                dest_exists = False
         
         # If destination doesn't exist, check for potential directory renames
         if not dest_exists:
@@ -610,6 +643,9 @@ class EmbySync:
             '--timeout=300'
         ]
         
+        if self.dry_run:
+            cmd.append('--dry-run')
+        
         if self.config["rsync_partial"]:
             cmd.append('--partial')
         
@@ -623,7 +659,11 @@ class EmbySync:
             if not self.running:
                 return False
                 
-            self.logger.info(f"SYNC: Attempt {attempt}/{self.config['max_retries']} for {source_path}")
+            sync_type = "[DRY RUN] " if self.dry_run else ""
+            self.logger.info(f"{sync_type}SYNC: Attempt {attempt}/{self.config['max_retries']} for {source_path}")
+            
+            if self.dry_run:
+                self.logger.info(f"[DRY RUN] Would execute: {' '.join(cmd)}")
             
             try:
                 process = subprocess.Popen(
@@ -647,15 +687,18 @@ class EmbySync:
                         if line and not line.startswith('sending incremental'):
                             # Log file being transferred
                             if '/' in line and not line.endswith('/'):
-                                self.logger.debug(f"TRANSFER: {line}")
+                                transfer_type = "[DRY RUN] " if self.dry_run else ""
+                                self.logger.debug(f"{transfer_type}TRANSFER: {line}")
                             elif 'to-chk=' in line and line_count % 50 == 0:
-                                self.logger.debug(f"PROGRESS: {line}")
+                                progress_type = "[DRY RUN] " if self.dry_run else ""
+                                self.logger.debug(f"{progress_type}PROGRESS: {line}")
                 
                 return_code = process.poll()
                 stderr_output = process.stderr.read()
                 
                 if return_code == 0:
-                    self.logger.info(f"Successfully synced {source_path}")
+                    success_type = "[DRY RUN] " if self.dry_run else ""
+                    self.logger.info(f"{success_type}Successfully synced {source_path}")
                     return True
                 else:
                     self.logger.error(f"Sync failed (attempt {attempt}) - exit code: {return_code}")
@@ -690,10 +733,14 @@ class EmbySync:
     def run(self):
         """Main execution method"""
         try:
-            self.logger.info("=== Emby Sync Script Started ===")
+            dry_run_prefix = "[DRY RUN] " if self.dry_run else ""
+            self.logger.info(f"=== {dry_run_prefix}Emby Sync Script Started ===")
             self.logger.info(f"Configuration loaded from: {self.config_path}")
             self.logger.info(f"Bandwidth limit: {self.config['bandwidth_limit_kbps']} KB/s")
             self.logger.info(f"Target directories: {len(self.config['source_paths'])}")
+            
+            if self.dry_run:
+                self.logger.info("=== DRY RUN MODE - No actual changes will be made ===")
             
             # Check for running instance
             if not self._check_lock():
@@ -739,8 +786,8 @@ class EmbySync:
                         if not self.running:
                             break
                             
-                        # Skip if already completed
-                        if subdir in self.state["completed_directories"]:
+                        # Skip if already completed (not applicable in dry run mode)
+                        if not self.dry_run and subdir in self.state["completed_directories"]:
                             self.logger.info(f"Skipping already completed directory: {subdir}")
                             continue
                         
@@ -766,13 +813,14 @@ class EmbySync:
             if self.running:
                 completed = len(self.state["completed_directories"])
                 failed = len(self.state["failed_directories"])
-                self.logger.info(f"=== Sync Complete ===")
+                self.logger.info(f"=== {dry_run_prefix}Sync Complete ===")
                 self.logger.info(f"Completed directories: {completed}")
                 self.logger.info(f"Failed directories: {failed}")
                 
                 if failed > 0:
                     self.logger.warning(f"Failed directories: {self.state['failed_directories']}")
-                    sys.exit(1)
+                    if not self.dry_run:
+                        sys.exit(1)
             else:
                 self.logger.info("Sync interrupted by shutdown signal")
                 sys.exit(0)
@@ -785,15 +833,22 @@ class EmbySync:
             sys.exit(1)
         finally:
             self._remove_lock()
-            self.logger.info("=== Emby Sync Script Ended ===")
+            self.logger.info(f"=== {dry_run_prefix}Emby Sync Script Ended ===")
 
 if __name__ == "__main__":
     try:
         config_path = "./embysyncconfig_test.json"
-        if len(sys.argv) > 1:
-            config_path = sys.argv[1]
+        dry_run = False
         
-        sync = EmbySync(config_path)
+        # Parse command line arguments
+        args = sys.argv[1:]
+        for i, arg in enumerate(args):
+            if arg in ['--dry-run', '-n']:
+                dry_run = True
+            elif not arg.startswith('-'):
+                config_path = arg
+        
+        sync = EmbySync(config_path, dry_run)
         sync.run()
     except Exception as e:
         print(f"Fatal error: {e}")
