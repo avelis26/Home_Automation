@@ -177,7 +177,7 @@
         name: "Emby Sync Cron"
         minute: "0"
         hour: "*/22"
-        job: "/usr/bin/python3 /home/avelis/source/Home_Automation/embysync.py --force-time"
+        job: "/usr/bin/python3 /home/avelis/source/Home_Automation/embysync.py --dry-run"
         user: avelis
         state: present
 
