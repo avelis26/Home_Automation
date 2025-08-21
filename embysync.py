@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# DRY RUN NOT WORKING
+# Possible failure to delete old dir's
 
 import os
 import sys
