@@ -621,17 +621,19 @@ class EmbySync:
                 )
                 
                 # Monitor progress and log current file being transferred
+                line_count = 0
                 while True:
                     output = process.stdout.readline()
                     if output == '' and process.poll() is not None:
                         break
                     if output and self.running:
+                        line_count += 1
                         line = output.strip()
                         if line and not line.startswith('sending incremental'):
                             # Log file being transferred
                             if '/' in line and not line.endswith('/'):
                                 self.logger.debug(f"TRANSFER: {line}")
-                            elif 'to-chk=' in line:
+                            elif 'to-chk=' in line and line_count % 50 == 0:
                                 self.logger.debug(f"PROGRESS: {line}")
                 
                 return_code = process.poll()
