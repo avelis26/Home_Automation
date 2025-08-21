@@ -176,7 +176,7 @@
       ansible.builtin.cron:
         name: "Emby Sync Cron"
         minute: "0"
-        hour: "*/6"
+        hour: "*/22"
         job: "/usr/bin/python3 /home/avelis/source/Home_Automation/embysync.py --force-time"
         user: avelis
         state: present
@@ -409,13 +409,13 @@
       tags: [bashrc]
 
     # System Reboot if Necessary
-    - name: Reboot if necessary
+    - name: Reboot #if necessary
       reboot:
         msg: "Rebooting system..."
-      when:
-          - apt_update_upgrade.changed
-          - snap_refresh.changed
-          - (emby_install is defined and emby_install.changed)
+      #when:
+      #    - apt_update_upgrade.changed
+      #    - snap_refresh.changed
+      #    - (emby_install is defined and emby_install.changed)
       tags: [reboot]
 
   handlers:
