@@ -156,11 +156,15 @@ class EmbySync:
         )
         
         # Setup file handler (skip in dry run mode to avoid writing to actual log file)
+        ############################################################
+        # TEST #####################################################
+        ############################################################
+        # Allowing write to real log file for dry run, make sure to change this back
         handlers = []
-        if not self.dry_run:
-            file_handler = logging.FileHandler(self.config["log_file"])
-            file_handler.setFormatter(formatter)
-            handlers.append(file_handler)
+        #if not self.dry_run:
+        file_handler = logging.FileHandler(self.config["log_file"])
+        file_handler.setFormatter(formatter)
+        handlers.append(file_handler)
         
         # Setup console handler (always enabled for dry run to show output)
         console_handler = logging.StreamHandler()
