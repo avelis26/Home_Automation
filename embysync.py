@@ -8,6 +8,8 @@ import logging
 import json
 import hashlib
 import signal
+import difflib
+#import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
@@ -135,7 +137,7 @@ class EmbySync:
         """Save current sync state to JSON file"""
         # Don't update the state file if ignore_state_file flag is true
         if self.ignore_state_file:
-            self.logger.info("Skipping state file update per config setting.")
+            self.logger.debug("Skipping state file update per config setting.")
             return
         try:
             with open(self.state_file, 'w') as f:
@@ -246,7 +248,152 @@ class EmbySync:
             self.logger.error(f"SSH test failed: {e}")
             return False
 
-    def _get_file_hash(self, file_path: str, chunk_size: int = 65536) -> Optional[str]:
+    def _get_directory_similarity(self, dir1: str, dir2: str) -> float:
+        """Calculate similarity ratio between two directory names"""
+        # Extract just the directory names, not full paths
+        name1 = os.path.basename(dir1.rstrip('/'))
+        name2 = os.path.basename(dir2.rstrip('/'))
+        
+        # Use difflib to calculate similarity ratio
+        return difflib.SequenceMatcher(None, name1.lower(), name2.lower()).ratio()
+
+    def _detect_directory_rename(self, source_dir: str, dest_full_path: str) -> Optional[str]:
+        """Detect if source directory might be a renamed version of an existing destination directory"""
+        self.logger.debug(f"Checking for directory renames for: {os.path.basename(source_dir)}")
+        
+        # Get the parent directory path on destination
+        dest_parent = os.path.dirname(dest_full_path)
+        
+        # List all directories in the destination parent
+        cmd = [
+            'ssh', '-o', 'BatchMode=yes',
+            f"{self.config['dest_user']}@{self.config['dest_host']}",
+            f'find "{dest_parent}" -maxdepth 1 -type d 2>/dev/null | grep -v "^{dest_parent}$" || true'
+        ]
+        
+        try:
+            result = subprocess.run(cmd, capture_output=True, timeout=30, text=True)
+            
+            if result.returncode == 0 and result.stdout.strip():
+                dest_dirs = result.stdout.strip().split('\n')
+                dest_dirs = [d for d in dest_dirs if d.strip()]
+                
+                source_basename = os.path.basename(source_dir)
+                best_match = None
+                best_similarity = 0.0
+                
+                for dest_dir in dest_dirs:
+                    similarity = self._get_directory_similarity(source_basename, dest_dir)
+                    self.logger.debug(f"Similarity between '{source_basename}' and '{os.path.basename(dest_dir)}': {similarity:.2f}")
+                    
+                    if similarity > best_similarity and similarity >= 0.7:  # 70% similarity threshold
+                        best_similarity = similarity
+                        best_match = dest_dir
+                
+                if best_match:
+                    self.logger.info(f"Found potential directory rename: '{os.path.basename(best_match)}' -> '{source_basename}' (similarity: {best_similarity:.2f})")
+                    
+                    # Additional safety check: verify the directories contain similar content
+                    if self._verify_directory_content_similarity(source_dir, best_match):
+                        return best_match
+                    else:
+                        self.logger.warning(f"Directory content differs too much, skipping rename for safety")
+                        return None
+                else:
+                    self.logger.debug(f"No similar directory found (best similarity: {best_similarity:.2f})")
+                    
+        except Exception as e:
+            self.logger.warning(f"Error detecting directory renames: {e}")
+        
+        return None
+
+    def _verify_directory_content_similarity(self, source_dir: str, dest_dir: str) -> bool:
+        """Verify that two directories contain similar content (file count and total size check)"""
+        try:
+            # Get source directory stats
+            source_files = []
+            source_total_size = 0
+            for root, dirs, files in os.walk(source_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    try:
+                        size = os.path.getsize(file_path)
+                        source_files.append(file)
+                        source_total_size += size
+                    except OSError:
+                        continue
+            
+            # Get destination directory stats
+            cmd = [
+                'ssh', '-o', 'BatchMode=yes',
+                f"{self.config['dest_user']}@{self.config['dest_host']}",
+                f'find "{dest_dir}" -type f -exec basename {{}} \\; 2>/dev/null | sort'
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, timeout=60, text=True)
+            
+            if result.returncode != 0:
+                return False
+                
+            dest_files = result.stdout.strip().split('\n')
+            dest_files = [f for f in dest_files if f.strip()]
+            
+            # Get total size of destination directory
+            size_cmd = [
+                'ssh', '-o', 'BatchMode=yes',
+                f"{self.config['dest_user']}@{self.config['dest_host']}",
+                f'du -sb "{dest_dir}" 2>/dev/null | cut -f1 || echo "0"'
+            ]
+            
+            size_result = subprocess.run(size_cmd, capture_output=True, timeout=30, text=True)
+            dest_total_size = int(size_result.stdout.strip()) if size_result.returncode == 0 else 0
+            
+            # Compare file counts and sizes
+            source_count = len(source_files)
+            dest_count = len(dest_files)
+            
+            # Allow some tolerance in file count (±2 files) and size (±10%)
+            count_similar = abs(source_count - dest_count) <= 2
+            size_similar = abs(source_total_size - dest_total_size) <= (source_total_size * 0.1) if source_total_size > 0 else dest_total_size == 0
+            
+            self.logger.debug(f"Content similarity check - Source: {source_count} files, {source_total_size} bytes; Dest: {dest_count} files, {dest_total_size} bytes")
+            self.logger.debug(f"Count similar: {count_similar}, Size similar: {size_similar}")
+            
+            return count_similar and size_similar
+            
+        except Exception as e:
+            self.logger.warning(f"Error verifying directory content similarity: {e}")
+            return False
+
+    def _handle_directory_rename(self, old_dest_path: str, new_dest_path: str) -> bool:
+        """Rename directory on destination"""
+        self.logger.info(f"DIRECTORY RENAME: {old_dest_path} -> {new_dest_path}")
+        
+        # Create parent directory if needed
+        parent_dir = os.path.dirname(new_dest_path)
+        mkdir_cmd = [
+            'ssh', '-o', 'BatchMode=yes',
+            f"{self.config['dest_user']}@{self.config['dest_host']}",
+            f'mkdir -p "{parent_dir}"'
+        ]
+        
+        subprocess.run(mkdir_cmd, capture_output=True, timeout=30)
+        
+        # Perform the rename
+        rename_cmd = [
+            'ssh', '-o', 'BatchMode=yes',
+            f"{self.config['dest_user']}@{self.config['dest_host']}",
+            f'mv "{old_dest_path}" "{new_dest_path}"'
+        ]
+        
+        result = subprocess.run(rename_cmd, capture_output=True, timeout=60, text=True)
+        
+        if result.returncode == 0:
+            self.logger.info(f"Successfully renamed directory on destination")
+            return True
+        else:
+            self.logger.error(f"Failed to rename directory: {result.stderr}")
+            return False
         """Calculate MD5 hash of entire file (matching remote md5sum behavior)."""
         try:
             hash_md5 = hashlib.md5()
@@ -409,7 +556,29 @@ class EmbySync:
         destination_path = f"{self.config['dest_user']}@{self.config['dest_host']}:{self.config['dest_base_path']}/{'/'.join(path_parts[media_index+1:])}"
         dest_full_path = f"{self.config['dest_base_path']}/{'/'.join(path_parts[media_index+1:])}"
         
-        # Detect and handle renames first
+        # Check if destination directory exists, if not, look for potential renames
+        exists_cmd = [
+            'ssh', '-o', 'BatchMode=yes',
+            f"{self.config['dest_user']}@{self.config['dest_host']}",
+            f'test -d "{dest_full_path}" && echo "EXISTS" || echo "MISSING"'
+        ]
+        
+        try:
+            result = subprocess.run(exists_cmd, capture_output=True, timeout=15, text=True)
+            dest_exists = result.stdout.strip() == "EXISTS"
+        except Exception:
+            dest_exists = False
+        
+        # If destination doesn't exist, check for potential directory renames
+        if not dest_exists:
+            potential_rename = self._detect_directory_rename(source_path, dest_full_path)
+            if potential_rename:
+                if self._handle_directory_rename(potential_rename, dest_full_path):
+                    self.logger.info(f"Directory rename completed, proceeding with file-level sync")
+                else:
+                    self.logger.warning(f"Directory rename failed, proceeding with full sync")
+        
+        # Detect and handle file renames
         renames = self._detect_renames(source_path, dest_full_path)
         if renames:
             self._handle_renames(renames, dest_full_path)
