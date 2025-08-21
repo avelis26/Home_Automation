@@ -40,7 +40,7 @@ class NetworkThrottle:
             self.transferred = 0
 
 class EmbySync:
-    def __init__(self, config_path: str = "./embysyncconfig.json", dry_run: bool = False):
+    def __init__(self, config_path: str = "./embysyncconfig.json", dry_run: bool = True):
         self.config_path = config_path
         self.dry_run = dry_run
         self.config = self._load_config()
