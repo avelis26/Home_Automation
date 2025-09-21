@@ -154,24 +154,7 @@
         owner: "{{ item.owner }}"
         group: media_access
         mode: '2775'
-      loop:
-        - { path: "/mnt/data/Torrents", owner: "debian-transmission" }
-        - { path: "/mnt/data/Media/Movies", owner: "avelis" }
-        - { path: "/mnt/data/Media/Shows", owner: "avelis" }
-        - { path: "/mnt/data/Media/Sports", owner: "avelis" }
-      tags: [permissions]
-
-    - name: Fix file permissions in media directories
-      shell: find "{{ item.path }}" -type f -exec chmod 664 {} \;
-      loop:
-        - { path: "/mnt/data/Torrents", owner: "debian-transmission" }
-        - { path: "/mnt/data/Media/Movies", owner: "avelis" }
-        - { path: "/mnt/data/Media/Shows", owner: "avelis" }
-        - { path: "/mnt/data/Media/Sports", owner: "avelis" }
-      tags: [permissions]
-
-    - name: Fix directory permissions in media directories
-      shell: find "{{ item.path }}" -type d -exec chmod 2775 {} \;
+        recurse: yes
       loop:
         - { path: "/mnt/data/Torrents", owner: "debian-transmission" }
         - { path: "/mnt/data/Media/Movies", owner: "avelis" }
@@ -184,7 +167,8 @@
         path: /mnt/data
         state: directory
         group: media_access
-        mode: '2775'
+        mode: g+rwX
+        recurse: yes
       tags: [permissions]
 
     # Emby Installation and Configuration
@@ -353,8 +337,8 @@
             valid users = {{ samba_users | map(attribute='username') | join(',') }}
             read only = no
             browsable = yes
-            create mask = 0664
-            directory mask = 0775
+            create mask = 0777
+            directory mask = 0777
       notify: Restart Samba
       tags: [samba]
 
