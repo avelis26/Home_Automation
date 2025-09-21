@@ -408,14 +408,9 @@
         - '[ -z "$SSH_CONNECTION" ] && [ -t 1 ] && btop'
       tags: [bashrc]
 
-    # System Reboot if Necessary
-    - name: Reboot #if necessary
+    - name: Reboot
       reboot:
         msg: "Rebooting system..."
-      #when:
-      #    - apt_update_upgrade.changed
-      #    - snap_refresh.changed
-      #    - (emby_install is defined and emby_install.changed)
       tags: [reboot]
 
   handlers:
