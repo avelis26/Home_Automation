@@ -189,13 +189,13 @@
         state: directory
         owner: "{{ transmission_user }}"
         group: "{{ media_group }}"
-        mode: '0777'  # drwxrwxrwx for directories
+        mode: '0775'  # drwxrwxr-x for directories
         recurse: no
       tags: [permissions]
 
     - name: Set Torrents files and subdirectories permissions
       shell: |
-        find /mnt/data/Torrents -type d -exec chmod 777 {} \;
+        find /mnt/data/Torrents -type d -exec chmod 775 {} \;
         find /mnt/data/Torrents -type f -exec chmod 664 {} \;
         find /mnt/data/Torrents -exec chown {{ transmission_user }}:{{ media_group }} {} \;
       changed_when: false
@@ -208,7 +208,7 @@
         state: directory
         owner: "{{ default_owner }}"
         group: "{{ media_group }}"
-        mode: '0777'  # drwxrwxrwx for directories
+        mode: '0775'  # drwxrwxr-x for directories
         recurse: no
       loop:
         - /mnt/data/Media/Movies
@@ -219,7 +219,7 @@
     - name: Set Media subdirectories recursive permissions
       shell: |
         for dir in Movies Shows Sports; do
-          find /mnt/data/Media/$dir -type d -exec chmod 777 {} \;
+          find /mnt/data/Media/$dir -type d -exec chmod 775 {} \;
           find /mnt/data/Media/$dir -type f -exec chmod 664 {} \;
           find /mnt/data/Media/$dir -exec chown {{ default_owner }}:{{ media_group }} {} \;
         done
@@ -246,7 +246,7 @@
           ! -path /mnt/data/Torrents \
           ! -path /mnt/data/Media \
           ! -path /mnt/data/emby \
-          -exec chmod 777 {} \; \
+          -exec chmod 775 {} \; \
           -exec chown {{ default_owner }}:{{ default_group }} {} \;
         
         # Handle subdirectories
@@ -256,7 +256,7 @@
           ! -path "/mnt/data/Media/Shows*" \
           ! -path "/mnt/data/Media/Sports*" \
           ! -path "/mnt/data/emby*" \
-          -exec chmod 777 {} \; \
+          -exec chmod 775 {} \; \
           -exec chown {{ default_owner }}:{{ default_group }} {} \;
         
         # Handle files
