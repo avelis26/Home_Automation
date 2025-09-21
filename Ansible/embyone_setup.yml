@@ -38,6 +38,7 @@
       - traceroute
       - transmission-daemon
       - whois
+      - yt-dlp
 
   tasks:
     # ============================================================
@@ -48,6 +49,15 @@
         name: America/Chicago
       become: yes
       tags: [system]
+
+    - name: Install updated yt-dlp from PPA
+      block:
+        - name: Add yt-dlp PPA repository
+          ansible.builtin.apt_repository:
+            repo: ppa:tomtomtom/yt-dlp
+            state: present
+            update_cache: yes
+          become: yes
 
     - name: Update APT cache and upgrade
       apt:
