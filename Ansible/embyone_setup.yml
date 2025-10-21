@@ -187,7 +187,7 @@
         path: /mnt/data
         state: directory
         owner: "{{ default_owner }}"
-        group: "{{ default_group }}"
+        group: "{{ media_group }}"
         mode: '0775'  # drwxrwxr-x
         recurse: no
       tags: [permissions]
