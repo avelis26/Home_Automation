@@ -257,7 +257,7 @@
           ! -path /mnt/data/Media \
           ! -path /mnt/data/emby \
           -exec chmod 775 {} \; \
-          -exec chown {{ default_owner }}:{{ default_group }} {} \;
+          -exec chown {{ default_owner }}:{{ media_group }} {} \;
         
         # Handle subdirectories
         find /mnt/data -mindepth 2 -type d \
@@ -267,7 +267,7 @@
           ! -path "/mnt/data/Media/Sports*" \
           ! -path "/mnt/data/emby*" \
           -exec chmod 775 {} \; \
-          -exec chown {{ default_owner }}:{{ default_group }} {} \;
+          -exec chown {{ default_owner }}:{{ media_group }} {} \;
         
         # Handle files
         find /mnt/data -type f \
@@ -277,7 +277,7 @@
           ! -path "/mnt/data/Media/Sports/*" \
           ! -path "/mnt/data/emby/*" \
           -exec chmod 664 {} \; \
-          -exec chown {{ default_owner }}:{{ default_group }} {} \;
+          -exec chown {{ default_owner }}:{{ media_group }} {} \;
       changed_when: false
       tags: [permissions]
 
@@ -458,6 +458,8 @@
           alias update="sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y && sudo snap refresh"
           alias embysynclog="tail -f /var/log/emby-sync.log | sed -e 's/.*ERROR.*/\x1b[31m&\x1b[0m/' -e 's/.*WARNING.*/\x1b[33m&\x1b[0m/' -e 's/.*INFO.*/\x1b[32m&\x1b[0m/' -e 's/.*DEBUG.*/\x1b[36m&\x1b[0m/'"
           alias nvtop="gpustat -a -i 1"
+          alias reboot="update && sudo reboot"
+          alias shutdown="update && sudo shutdown now"
           
           # Path Configuration
           export PATH="$PATH:/home/{{ linux_user }}/.local/bin"
@@ -492,7 +494,7 @@
       reboot:
         msg: "Rebooting system to apply all changes..."
         reboot_timeout: 900
-      tags: [never, reboot]
+      tags: [reboot]
 
   # ============================================================
   # Handlers
