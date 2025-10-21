@@ -1,6 +1,8 @@
 ---
 # Playbook to set up an Emby media server with Samba, Transmission, and LVM
 # Prerequisites: Ubuntu Server, LVM volume /dev/mapper/vg_data-lv_data, secrets_one.yml
+# v2.0
+# graham.pinkston@gmail.com
 - hosts: embyone
   become: yes
   vars_files:
