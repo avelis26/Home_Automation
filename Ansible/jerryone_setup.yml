@@ -1,0 +1,529 @@
+---
+# TEMP playbook to set up an Emby on the gaming PC
+# Prerequisites: Ubuntu Server
+# graham.pinkston@gmail.com
+- hosts: embyone
+  become: yes
+  vars_files:
+    - secrets_one.yml
+  vars:
+    # Storage Configuration
+    mount_point: /mnt/data
+    lvm_device: /dev/mapper/vg_data-lv_data
+    filesystem_type: ext4
+    
+    # Permission Configuration
+    media_group: media_access
+    default_owner: avelis
+    default_group: avelis
+    transmission_user: debian-transmission
+    
+    # Package Lists
+    base_packages:
+      - btop
+      - curl
+      - ffmpeg
+      - gcc
+      - git
+      - gpustat
+      - iputils-ping
+      - make
+      - nano
+      - nfs-kernel-server
+      - python3-full
+      - python3-paramiko
+      - python3-pip
+      - python3-psutil
+      - python3-tzlocal
+      - samba
+      - traceroute
+      - transmission-daemon
+      - whois
+      - yt-dlp
+
+  tasks:
+    # ============================================================
+    # System Setup and Package Management
+    # ============================================================
+    - name: Set timezone to America/Chicago
+      community.general.timezone:
+        name: America/Chicago
+      become: yes
+      tags: [system]
+
+    - name: Install updated yt-dlp from PPA
+      block:
+        - name: Add yt-dlp PPA repository
+          ansible.builtin.apt_repository:
+            repo: ppa:tomtomtom/yt-dlp
+            state: present
+            update_cache: yes
+          become: yes
+
+    - name: Update APT cache and upgrade
+      apt:
+        update_cache: yes
+        upgrade: dist
+      register: apt_update_upgrade
+      tags: [packages]
+
+    - name: Install Base Packages
+      apt:
+        name: "{{ base_packages }}"
+        state: present
+      tags: [packages]
+
+    - name: Update and upgrade Snap packages
+      command: snap refresh
+      register: snap_refresh
+      changed_when: "'All snaps up to date' not in snap_refresh.stdout"
+      tags: [packages]
+
+    # ============================================================
+    # SSH Configuration
+    # ============================================================
+    - name: Create SSH Directory
+      file:
+        path: "/home/{{ linux_user }}/.ssh"
+        state: directory
+        owner: "{{ linux_user }}"
+        group: "{{ linux_user }}"
+        mode: '0700'
+      tags: [ssh]
+
+    - name: Add SSH keys
+      authorized_key:
+        user: "{{ linux_user }}"
+        key: "{{ item }}"
+        state: present
+      loop: "{{ ssh_keys + [lookup('file', '/home/pi-star/.ssh/id_rsa.pub')] }}"
+      tags: [ssh]
+
+    - name: Add User To Sudoers
+      lineinfile:
+        path: /etc/sudoers
+        line: "{{ linux_user }} ALL=(ALL:ALL) NOPASSWD:ALL"
+        validate: 'visudo -cf %s'
+      tags: [ssh]
+
+    # ============================================================
+    # Auto-login Configuration
+    # ============================================================
+    - name: Create getty service directory
+      file:
+        path: /etc/systemd/system/getty@tty1.service.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      tags: [autologin]
+
+    - name: Configure auto-login for avelis on TTY1
+      copy:
+        dest: /etc/systemd/system/getty@tty1.service.d/autologin.conf
+        content: |
+          [Service]
+          ExecStart=
+          ExecStart=-/sbin/agetty --autologin avelis --noclear %I $TERM
+        owner: root
+        group: root
+        mode: '0644'
+      tags: [autologin]
+
+    # ============================================================
+    # LVM and Storage Setup
+    # ============================================================
+    - name: Check if LVM device exists
+      stat:
+        path: "{{ lvm_device }}"
+      register: lvm_stat
+      failed_when: not lvm_stat.stat.exists
+      tags: [lvm, storage]
+
+    - name: Mount LVM device via FSTAB
+      mount:
+        path: "{{ mount_point }}"
+        src: "{{ lvm_device }}"
+        fstype: "{{ filesystem_type }}"
+        opts: defaults
+        state: mounted
+      when: lvm_stat.stat.exists
+      tags: [lvm, storage]
+
+    # ============================================================
+    # User and Group Management
+    # ============================================================
+    - name: Create shared media group
+      group:
+        name: "{{ media_group }}"
+        state: present
+      tags: [users, groups]
+
+    - name: Add users to media_access group
+      user:
+        name: "{{ item }}"
+        groups: "{{ media_group }}"
+        append: yes
+      loop:
+        - avelis
+        - debian-transmission
+        - emby
+        - samba
+      tags: [users, groups]
+
+    - name: Add avelis to samba group
+      user:
+        name: avelis
+        groups: samba
+        append: yes
+      tags: [users, groups]
+
+    # ============================================================
+    # Directory Structure and Permissions
+    # ============================================================
+    
+    # Set root /mnt/data permissions (non-recursive)
+    - name: Set /mnt/data root directory permissions
+      file:
+        path: /mnt/data
+        state: directory
+        owner: "{{ default_owner }}"
+        group: "{{ media_group }}"
+        mode: '0775'  # drwxrwxr-x
+        recurse: no
+      tags: [permissions]
+
+    # Set Torrents directory permissions
+    - name: Set Torrents directory permissions
+      file:
+        path: /mnt/data/Torrents
+        state: directory
+        owner: "{{ transmission_user }}"
+        group: "{{ media_group }}"
+        mode: '0775'  # drwxrwxr-x for directories
+        recurse: no
+      tags: [permissions]
+
+    - name: Set Torrents files and subdirectories permissions
+      shell: |
+        find /mnt/data/Torrents -type d -exec chmod 775 {} \;
+        find /mnt/data/Torrents -type f -exec chmod 664 {} \;
+        find /mnt/data/Torrents -exec chown {{ transmission_user }}:{{ media_group }} {} \;
+      changed_when: false
+      tags: [permissions]
+
+    # Set Media subdirectories permissions
+    - name: Set Media subdirectories base permissions
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ default_owner }}"
+        group: "{{ media_group }}"
+        mode: '0775'  # drwxrwxr-x for directories
+        recurse: no
+      loop:
+        - /mnt/data/Media/Movies
+        - /mnt/data/Media/Shows
+        - /mnt/data/Media/Sports
+      tags: [permissions]
+
+    - name: Set Media subdirectories recursive permissions
+      shell: |
+        for dir in Movies Shows Sports; do
+          find /mnt/data/Media/$dir -type d -exec chmod 775 {} \;
+          find /mnt/data/Media/$dir -type f -exec chmod 664 {} \;
+          find /mnt/data/Media/$dir -exec chown {{ default_owner }}:{{ media_group }} {} \;
+        done
+      changed_when: false
+      tags: [permissions]
+
+    # Set emby directory permissions (special case)
+    - name: Set emby directory permissions
+      file:
+        path: /mnt/data/emby
+        state: directory
+        owner: emby
+        group: emby
+        mode: '0755'
+        recurse: yes
+      tags: [permissions, emby]
+
+    # Set default permissions for all other directories and files
+    - name: Find and set permissions for other directories under /mnt/data
+      shell: |
+        # Find all directories except the explicitly managed ones
+        find /mnt/data -maxdepth 1 -type d \
+          ! -path /mnt/data \
+          ! -path /mnt/data/Torrents \
+          ! -path /mnt/data/Media \
+          ! -path /mnt/data/emby \
+          -exec chmod 775 {} \; \
+          -exec chown {{ default_owner }}:{{ media_group }} {} \;
+        
+        # Handle subdirectories
+        find /mnt/data -mindepth 2 -type d \
+          ! -path "/mnt/data/Torrents*" \
+          ! -path "/mnt/data/Media/Movies*" \
+          ! -path "/mnt/data/Media/Shows*" \
+          ! -path "/mnt/data/Media/Sports*" \
+          ! -path "/mnt/data/emby*" \
+          -exec chmod 775 {} \; \
+          -exec chown {{ default_owner }}:{{ media_group }} {} \;
+        
+        # Handle files
+        find /mnt/data -type f \
+          ! -path "/mnt/data/Torrents/*" \
+          ! -path "/mnt/data/Media/Movies/*" \
+          ! -path "/mnt/data/Media/Shows/*" \
+          ! -path "/mnt/data/Media/Sports/*" \
+          ! -path "/mnt/data/emby/*" \
+          -exec chmod 664 {} \; \
+          -exec chown {{ default_owner }}:{{ media_group }} {} \;
+      changed_when: false
+      tags: [permissions]
+
+    # ============================================================
+    # Emby Installation and Configuration
+    # ============================================================
+    - name: Get latest Emby version from GitHub API
+      uri:
+        url: https://api.github.com/repos/MediaBrowser/Emby.Releases/releases/latest
+        method: GET
+        return_content: yes
+      register: emby_latest_release
+      tags: [emby]
+
+    - name: Display emby_latest_release
+      debug:
+        msg: "emby_latest_release: {{ emby_latest_release.json.tag_name }}"
+      tags: [emby]
+
+    - name: Set Emby version facts
+      set_fact:
+        emby_version: "{{ emby_latest_release.json.tag_name }}"
+        emby_deb_url: "https://github.com/MediaBrowser/Emby.Releases/releases/download/{{ emby_latest_release.json.tag_name }}/emby-server-deb_{{ emby_latest_release.json.tag_name }}_amd64.deb"
+        emby_deb_path: "/tmp/emby-server-deb_{{ emby_latest_release.json.tag_name }}_amd64.deb"
+      tags: [emby]
+
+    - name: Check installed Emby version
+      command: dpkg-query -W -f='${Version}' emby-server
+      register: emby_version_check
+      changed_when: false
+      failed_when: false
+      tags: [emby]
+
+    - name: Set current Emby version fact
+      set_fact:
+        current_emby_version: "{{ emby_version_check.stdout | default('none') }}"
+      tags: [emby]
+
+    - name: Display version comparison
+      debug:
+        msg: "Will {{ 'skip download - same version' if current_emby_version == emby_version else 'download and install - version mismatch' }}"
+      tags: [emby]
+
+    - name: Download Emby .deb
+      get_url:
+        url: "{{ emby_deb_url }}"
+        dest: "{{ emby_deb_path }}"
+      when: current_emby_version != emby_version
+      tags: [emby]
+
+    - name: Install or update Emby
+      apt:
+        deb: "{{ emby_deb_path }}"
+      when: current_emby_version != emby_version
+      notify: Restart Emby
+      register: emby_install
+      tags: [emby]
+
+    - name: Create Emby system directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: emby
+        group: emby
+        mode: '0755'
+      loop:
+        - /var/lib/emby/metadata
+        - /var/lib/emby/temp
+      tags: [emby]
+
+    # ============================================================
+    # Samba Configuration
+    # ============================================================
+    - name: Create Samba User
+      user:
+        name: "{{ item.username }}"
+        state: present
+        groups: debian-transmission
+        append: yes
+        create_home: no
+      with_items: "{{ samba_users }}"
+      no_log: true
+      tags: [samba]
+
+    - name: Check if Samba user exists
+      command: pdbedit -L
+      register: samba_user_check
+      changed_when: false
+      failed_when: false
+      tags: [samba]
+
+    - name: Set Samba Password
+      shell: "printf '{{ item.password }}\n{{ item.password }}\n' | smbpasswd -a {{ item.username }}"
+      when: item.username not in samba_user_check.stdout
+      with_items: "{{ samba_users }}"
+      no_log: true
+      tags: [samba]
+
+    - name: Configure Samba Share
+      blockinfile:
+        path: /etc/samba/smb.conf
+        block: |
+          [data]
+            path = /mnt/data
+            valid users = {{ samba_users | map(attribute='username') | join(',') }}
+            read only = no
+            browsable = yes
+            create mask = 0777
+            directory mask = 0777
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - DATA SHARE"
+      notify: Restart Samba
+      tags: [samba]
+
+    # ============================================================
+    # Transmission Configuration
+    # ============================================================
+    - name: Stop Transmission Daemon
+      systemd:
+        name: transmission-daemon
+        state: stopped
+      tags: [transmission]
+
+    - name: Update Transmission Settings
+      template:
+        src: transmission_settings.json
+        dest: /etc/transmission-daemon/settings.json
+        owner: debian-transmission
+        group: debian-transmission
+        mode: '0644'
+      register: transmission_settings
+      notify: Restart Transmission
+      tags: [transmission]
+
+    - name: Change Transmission Service Type
+      lineinfile:
+        path: /lib/systemd/system/transmission-daemon.service
+        regexp: '^Type=notify'
+        line: 'Type=simple'
+        state: present
+      notify: Restart Transmission
+      tags: [transmission]
+
+    - name: Enable Transmission Daemon
+      systemd:
+        name: transmission-daemon
+        enabled: yes
+        daemon_reload: yes
+      tags: [transmission]
+
+    # ============================================================
+    # NFS Configuration
+    # ============================================================
+    - name: Configure NFS exports
+      lineinfile:
+        path: /etc/exports
+        line: "/mnt/data 192.168.50.0/24(rw,sync,no_subtree_check)"
+        create: yes
+      notify: Restart NFS
+      tags: [nfs]
+
+    - name: Ensure NFS is running
+      systemd:
+        name: nfs-kernel-server
+        state: started
+        enabled: yes
+      tags: [nfs]
+
+    # ============================================================
+    # Shell Configuration
+    # ============================================================
+    - name: Configure shell aliases in .bashrc
+      blockinfile:
+        path: "/home/{{ linux_user }}/.bashrc"
+        block: |
+          # Custom Aliases
+          alias ls="ls -lhAp --color=always"
+          alias ll="ls -lhAp --color=always"
+          alias update="sudo apt update && sudo apt full-upgrade -y && sudo apt autoremove -y && sudo snap refresh"
+          alias embysynclog="tail -f /var/log/emby-sync.log | sed -e 's/.*ERROR.*/\x1b[31m&\x1b[0m/' -e 's/.*WARNING.*/\x1b[33m&\x1b[0m/' -e 's/.*INFO.*/\x1b[32m&\x1b[0m/' -e 's/.*DEBUG.*/\x1b[36m&\x1b[0m/'"
+          alias nvtop="gpustat -a -i 1"
+          alias reboot="update && sudo reboot"
+          alias shutdown="update && sudo shutdown now"
+          
+          # Path Configuration
+          export PATH="$PATH:/home/{{ linux_user }}/.local/bin"
+          
+          # Auto-start btop on TTY login
+          [ -z "$SSH_CONNECTION" ] && [ -t 1 ] && btop
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - SHELL CONFIG"
+        create: yes
+      tags: [bashrc, shell]
+
+    # ============================================================
+    # Cron Jobs (Removed/Disabled)
+    # ============================================================
+    - name: Remove Emby Sync Cron Job
+      ansible.builtin.cron:
+        name: "Emby Sync Cron"
+        user: avelis
+        state: absent
+      tags: [cron]
+
+    - name: Remove Rotate Emby Sync Log Cron Job
+      ansible.builtin.cron:
+        name: "Emby Log Cron"
+        user: avelis
+        state: absent
+      tags: [cron]
+
+    # ============================================================
+    # Final System Reboot
+    # ============================================================
+    - name: Reboot system
+      reboot:
+        msg: "Rebooting system to apply all changes..."
+        reboot_timeout: 900
+      tags: [reboot]
+
+  # ============================================================
+  # Handlers
+  # ============================================================
+  handlers:
+    - name: Restart Emby
+      systemd:
+        name: emby-server
+        state: restarted
+        enabled: yes
+        daemon_reload: yes
+
+    - name: Restart Samba
+      systemd:
+        name: smbd
+        state: restarted
+        enabled: yes
+        daemon_reload: yes
+
+    - name: Restart Transmission
+      systemd:
+        name: transmission-daemon
+        state: restarted
+        enabled: yes
+        daemon_reload: yes
+
+    - name: Restart NFS
+      systemd:
+        name: nfs-kernel-server
+        state: restarted
+        enabled: yes
