@@ -9,7 +9,6 @@
   vars:
     # Storage Configuration
     mount_point: /mnt/data
-    lvm_device: /dev/mapper/vg_data-lv_data
     filesystem_type: ext4
     
     # Permission Configuration
@@ -82,15 +81,6 @@
     # ============================================================
     # SSH Configuration
     # ============================================================
-    - name: Create SSH Directory
-      file:
-        path: "/home/{{ linux_user }}/.ssh"
-        state: directory
-        owner: "{{ linux_user }}"
-        group: "{{ linux_user }}"
-        mode: '0700'
-      tags: [ssh]
-
     - name: Add SSH keys
       authorized_key:
         user: "{{ linux_user }}"
@@ -131,24 +121,15 @@
       tags: [autologin]
 
     # ============================================================
-    # LVM and Storage Setup
+    # Fstab and Storage Setup
     # ============================================================
-    - name: Check if LVM device exists
-      stat:
-        path: "{{ lvm_device }}"
-      register: lvm_stat
-      failed_when: not lvm_stat.stat.exists
-      tags: [lvm, storage]
-
-    - name: Mount LVM device via FSTAB
+    - name: Edit FSTAB
       mount:
-        path: "{{ mount_point }}"
-        src: "{{ lvm_device }}"
-        fstype: "{{ filesystem_type }}"
+        path: /mnt/data
+        src: /dev/sdb1
+        fstype: ext4
         opts: defaults
         state: mounted
-      when: lvm_stat.stat.exists
-      tags: [lvm, storage]
 
     # ============================================================
     # User and Group Management
