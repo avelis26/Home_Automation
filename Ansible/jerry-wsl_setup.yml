@@ -44,14 +44,17 @@
     #  tags: [packages]
 
     # TESTING @@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$
-    - name: Update APT cache and upgrade
-      apt:
-        update_cache: yes
-        upgrade: dist
-      environment:
-        http_proxy: ""
-        https_proxy: ""
-        no_proxy: "localhost,127.0.0.1"
+    #- name: Update APT cache and upgrade
+    #  apt:
+    #    update_cache: yes
+    #    upgrade: dist
+    #  environment:
+    #    http_proxy: ""
+    #    https_proxy: ""
+    #    no_proxy: "localhost,127.0.0.1"
+    #  tags: [packages]
+    - name: Run apt-get upgrade with login shell
+      shell: bash -l -c "apt-get update && apt-get dist-upgrade -y"
       tags: [packages]
 
     - name: Install Base Packages
