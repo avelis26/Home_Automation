@@ -37,11 +37,11 @@
         name: America/Chicago
       tags: [system]
 
-    #- name: Update APT cache and upgrade
-    #  apt:
-    #    update_cache: yes
-    #    upgrade: dist
-    #  tags: [packages]
+    - name: Update APT cache and upgrade
+      apt:
+        update_cache: yes
+        upgrade: dist
+      tags: [packages]
 
     # TESTING @@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$
 
