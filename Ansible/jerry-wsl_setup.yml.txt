@@ -37,21 +37,10 @@
         name: America/Chicago
       tags: [system]
 
-    #- name: Update APT cache and upgrade
-    #  apt:
-    #    update_cache: yes
-    #    upgrade: dist
-    #  tags: [packages]
-
-    # TESTING @@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$
     - name: Update APT cache and upgrade
       apt:
         update_cache: yes
         upgrade: dist
-      environment:
-        http_proxy: ""
-        https_proxy: ""
-        no_proxy: "localhost,127.0.0.1"
       tags: [packages]
 
     - name: Install Base Packages
