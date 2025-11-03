@@ -1,0 +1,213 @@
+---
+# WSL Emby Setup Playbook
+# This is a minimal version for running Emby in WSL on Windows 11
+# Prerequisites: WSL2 with Ubuntu 22.04, ext4 drive mounted
+# Usage: ansible-playbook -i localhost, -c local wsl_emby_setup.yml
+
+- hosts: jerry-wsl
+  become: yes
+  connection: local
+  vars_files:
+    - secrets_one.yml
+  vars:
+    # Storage Configuration
+    #mount_point: /mnt/wsl/PHYSICALDRIVE1p1
+    mount_point: /mnt/data
+    filesystem_type: ext4
+    
+    # Permission Configuration
+    media_group: media_access
+    default_owner: avelis
+    transmission_user: debian-transmission
+    
+    # Package Lists
+    base_packages:
+      - btop
+      - curl
+      - ffmpeg
+      - samba
+      - transmission-daemon
+
+  tasks:
+    # ============================================================
+    # System Setup and Package Management
+    # ============================================================
+    - name: Set timezone to America/Chicago
+      community.general.timezone:
+        name: America/Chicago
+      tags: [system]
+
+    - name: Update APT cache and upgrade
+      apt:
+        update_cache: yes
+        upgrade: dist
+      tags: [packages]
+
+    - name: Install Base Packages
+      apt:
+        name: "{{ base_packages }}"
+        state: present
+      tags: [packages]
+
+    # ============================================================
+    # User and Group Management
+    # ============================================================
+    - name: Create shared media group
+      group:
+        name: "{{ media_group }}"
+        state: present
+      tags: [users, groups]
+
+    - name: Add users to media_access group
+      user:
+        name: "{{ item }}"
+        groups: "{{ media_group }}"
+        append: yes
+      loop:
+        - "{{ ansible_user_id }}"
+        - debian-transmission
+        - emby
+      tags: [users, groups]
+
+    # ============================================================
+    # Emby Installation and Configuration
+    # ============================================================
+    - name: Get latest Emby version from GitHub API
+      uri:
+        url: https://api.github.com/repos/MediaBrowser/Emby.Releases/releases/latest
+        method: GET
+        return_content: yes
+      register: emby_latest_release
+      tags: [emby]
+
+    - name: Set Emby version facts
+      set_fact:
+        emby_version: "{{ emby_latest_release.json.tag_name }}"
+        emby_deb_url: "https://github.com/MediaBrowser/Emby.Releases/releases/download/{{ emby_latest_release.json.tag_name }}/emby-server-deb_{{ emby_latest_release.json.tag_name }}_amd64.deb"
+        emby_deb_path: "/tmp/emby-server-deb_{{ emby_latest_release.json.tag_name }}_amd64.deb"
+      tags: [emby]
+
+    - name: Check installed Emby version
+      command: dpkg-query -W -f='${Version}' emby-server
+      register: emby_version_check
+      changed_when: false
+      failed_when: false
+      tags: [emby]
+
+    - name: Download Emby .deb if needed
+      get_url:
+        url: "{{ emby_deb_url }}"
+        dest: "{{ emby_deb_path }}"
+      when: emby_version_check.stdout != emby_version
+      tags: [emby]
+
+    - name: Install or update Emby
+      apt:
+        deb: "{{ emby_deb_path }}"
+      when: emby_version_check.stdout != emby_version
+      notify: Restart Emby
+      tags: [emby]
+
+    - name: Ensure Emby data directory exists
+      file:
+        path: "{{ mount_point }}/emby"
+        state: directory
+        owner: emby
+        group: emby
+        mode: '0755'
+      tags: [emby]
+
+    - name: Enable Emby service
+      systemd:
+        name: emby-server
+        enabled: yes
+        state: started
+      tags: [emby]
+
+    # ============================================================
+    # Samba Configuration
+    # ============================================================
+    - name: Create Samba User
+      user:
+        name: "{{ item.username }}"
+        state: present
+        groups: "{{ media_group }}"
+        append: yes
+      with_items: "{{ samba_users }}"
+      no_log: true
+      tags: [samba]
+
+    - name: Check if Samba user exists
+      command: pdbedit -L
+      register: samba_user_check
+      changed_when: false
+      failed_when: false
+      tags: [samba]
+
+    - name: Set Samba Password
+      shell: "printf '{{ item.password }}\n{{ item.password }}\n' | smbpasswd -a {{ item.username }}"
+      when: item.username not in samba_user_check.stdout
+      with_items: "{{ samba_users }}"
+      no_log: true
+      tags: [samba]
+
+    - name: Configure Samba for WSL
+      blockinfile:
+        path: /etc/samba/smb.conf
+        block: |
+          [global]
+            # WSL-specific settings
+            bind interfaces only = yes
+            interfaces = lo eth0
+            
+          [data]
+            path = {{ mount_point }}
+            valid users = {{ samba_users | map(attribute='username') | join(',') }}
+            read only = no
+            browsable = yes
+            create mask = 0664
+            directory mask = 0775
+            force group = {{ media_group }}
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - WSL DATA SHARE"
+      notify: Restart Samba
+      tags: [samba]
+
+    # ============================================================
+    # Transmission Configuration
+    # ============================================================
+    - name: Stop Transmission Daemon
+      systemd:
+        name: transmission-daemon
+        state: stopped
+      tags: [transmission]
+
+    - name: Update Transmission Settings
+      template:
+        src: transmission_settings.json
+        dest: /etc/transmission-daemon/settings.json
+        owner: debian-transmission
+        group: debian-transmission
+        mode: '0644'
+      notify: Restart Transmission
+      tags: [transmission]
+
+    - name: Enable Transmission Daemon
+      systemd:
+        name: transmission-daemon
+        enabled: yes
+        state: started
+      tags: [transmission]
+
+  # ============================================================
+  # Handlers
+  # ============================================================
+  handlers:
+    - name: Restart Emby
+      systemd:
+        name: emby-server
+        state: restarted
+
+    - name: Restart Samba
+      systemd:
+        name: smbd
+        state: restarted
