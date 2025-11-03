@@ -44,6 +44,7 @@
     #  tags: [packages]
 
     # TESTING @@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$@@@###$$$
+
     #- name: Update APT cache and upgrade
     #  apt:
     #    update_cache: yes
@@ -53,9 +54,10 @@
     #    https_proxy: ""
     #    no_proxy: "localhost,127.0.0.1"
     #  tags: [packages]
-    - name: Run apt-get upgrade with login shell
-      shell: bash -l -c "sudo apt update && sudo apt get upgrade -y && sudo apt dist-upgrade -y"
-      tags: [packages]
+
+    #- name: Run apt-get upgrade with login shell
+    #  shell: bash -l -c "sudo apt update && sudo apt get upgrade -y && sudo apt dist-upgrade -y"
+    #  tags: [packages]
 
     - name: Install Base Packages
       apt:
