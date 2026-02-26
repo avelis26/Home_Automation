@@ -1,4 +1,4 @@
-# ytplaylist_record.py
+# yt-dlp-music-pl.py
 
 Realtime YouTube playlist audio recorder. Plays each track through your speakers via `mpv` while simultaneously recording from your PipeWire/PulseAudio monitor, auto-splitting and naming files from playlist metadata.
 
@@ -12,12 +12,12 @@ pip install yt-dlp --break-system-packages
 ## Usage
 
 ```bash
-python3 ytplaylist_record.py <playlist_url> [output_dir]
+python3 yt-dlp-music-pl.py <playlist_url> [output_dir]
 ```
 
 **Example:**
 ```bash
-python3 ytplaylist_record.py "https://www.youtube.com/playlist?list=XXXXXXX" /mnt/data/Media/Music/trucker
+python3 yt-dlp-music-pl.py "https://www.youtube.com/playlist?list=XXXXXXX" /mnt/data/Media/Music/trucker
 ```
 
 If `output_dir` is omitted, files are saved to the current directory.
@@ -25,8 +25,8 @@ If `output_dir` is omitted, files are saved to the current directory.
 ## Adding to Your Repo
 
 ```bash
-cp ytplaylist_record.py ~/path/to/Home_Automation/
-git add ytplaylist_record.py
+cp yt-dlp-music-pl.py ~/path/to/Home_Automation/
+git add yt-dlp-music-pl.py
 git commit -m "Add YouTube playlist realtime audio recorder"
 git push
 ```
