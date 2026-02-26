@@ -1,0 +1,235 @@
+#!/usr/bin/env python3
+"""
+ytplaylist_record.py - Realtime YouTube playlist audio recorder
+Records audio through system monitor (PipeWire/PulseAudio) while playing
+each track via mpv, auto-splitting and naming files from playlist metadata.
+
+Usage:
+    python3 ytplaylist_record.py <playlist_url> [output_dir]
+
+Requirements:
+    pip install yt-dlp --break-system-packages
+    sudo apt install mpv ffmpeg
+
+Optional (better than default PulseAudio sink detection):
+    sudo apt install pactl  (usually pre-installed)
+"""
+
+import subprocess
+import sys
+import os
+import re
+import time
+import json
+import threading
+import signal
+import shutil
+from pathlib import Path
+
+
+# ─────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────
+
+def sanitize_filename(name: str) -> str:
+    """Remove characters that are illegal in filenames."""
+    name = re.sub(r'[\\/*?:"<>|]', "", name)
+    name = name.strip().rstrip(".")
+    return name or "unknown"
+
+
+def get_monitor_source() -> str:
+    """
+    Auto-detect the default PulseAudio/PipeWire monitor source.
+    Falls back to 'default.monitor' which works on most PipeWire setups.
+    """
+    try:
+        result = subprocess.run(
+            ["pactl", "get-default-sink"],
+            capture_output=True, text=True, timeout=5
+        )
+        sink = result.stdout.strip()
+        if sink:
+            monitor = sink + ".monitor"
+            print(f"[recorder] Using monitor source: {monitor}")
+            return monitor
+    except Exception:
+        pass
+    print("[recorder] Could not detect sink, falling back to default.monitor")
+    return "default.monitor"
+
+
+def fetch_playlist_info(url: str) -> list[dict]:
+    """Use yt-dlp to extract playlist metadata without downloading."""
+    print(f"[yt-dlp] Fetching playlist metadata...")
+    cmd = [
+        "yt-dlp",
+        "--flat-playlist",
+        "--print", "%(playlist_index)s\t%(title)s\t%(duration)s\t%(webpage_url)s",
+        url
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"[yt-dlp] Error fetching playlist:\n{result.stderr}")
+        sys.exit(1)
+
+    tracks = []
+    for line in result.stdout.strip().splitlines():
+        parts = line.split("\t")
+        if len(parts) < 4:
+            continue
+        index, title, duration_str, track_url = parts[0], parts[1], parts[2], parts[3]
+        try:
+            duration = int(float(duration_str)) if duration_str not in ("", "NA", "None") else None
+        except ValueError:
+            duration = None
+        tracks.append({
+            "index": index.zfill(2),
+            "title": sanitize_filename(title),
+            "duration": duration,
+            "url": track_url,
+        })
+
+    print(f"[yt-dlp] Found {len(tracks)} tracks.")
+    return tracks
+
+
+# ─────────────────────────────────────────────
+# Core record + play logic
+# ─────────────────────────────────────────────
+
+def record_track(monitor_source: str, output_path: str, duration: int | None,
+                 stop_event: threading.Event):
+    """
+    Run ffmpeg recording from the monitor source.
+    Stops when stop_event is set OR duration (+ small buffer) elapses.
+    """
+    cmd = [
+        "ffmpeg", "-y",
+        "-f", "pulse",
+        "-i", monitor_source,
+        "-acodec", "libmp3lame",
+        "-q:a", "0",          # best VBR quality
+    ]
+    if duration:
+        # Add a 3-second buffer so we don't cut off the tail
+        cmd += ["-t", str(duration + 3)]
+    cmd.append(output_path)
+
+    proc = subprocess.Popen(
+        cmd,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    # Poll until stop_event or process ends naturally
+    while not stop_event.is_set():
+        if proc.poll() is not None:
+            break
+        time.sleep(0.5)
+
+    if proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
+def play_track(url: str, stop_event: threading.Event):
+    """
+    Play a single track via mpv (audio only, routed through normal speakers).
+    Sets stop_event when playback finishes.
+    """
+    cmd = [
+        "mpv",
+        "--no-video",
+        "--ytdl=yes",
+        "--really-quiet",
+        url
+    ]
+    proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL)
+    proc.wait()
+    stop_event.set()
+
+
+# ─────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python3 ytplaylist_record.py <playlist_url> [output_dir]")
+        sys.exit(1)
+
+    playlist_url = sys.argv[1]
+    output_dir = Path(sys.argv[2]) if len(sys.argv) >= 3 else Path.cwd()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Dependency check
+    for tool in ("mpv", "ffmpeg", "yt-dlp"):
+        if not shutil.which(tool):
+            print(f"[error] Required tool not found: {tool}")
+            sys.exit(1)
+
+    tracks = fetch_playlist_info(playlist_url)
+    if not tracks:
+        print("[error] No tracks found in playlist.")
+        sys.exit(1)
+
+    monitor_source = get_monitor_source()
+
+    print(f"\n[info] Output directory: {output_dir}")
+    print(f"[info] Starting playback + recording...\n")
+    print("       Press Ctrl+C to stop early.\n")
+
+    for i, track in enumerate(tracks, 1):
+        filename = f"{track['index']} - {track['title']}.mp3"
+        output_path = str(output_dir / filename)
+
+        # Skip if already recorded
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 10_000:
+            print(f"[skip]  ({i}/{len(tracks)}) {filename} — already exists")
+            continue
+
+        print(f"[play]  ({i}/{len(tracks)}) {filename}")
+        if track['duration']:
+            mins, secs = divmod(track['duration'], 60)
+            print(f"        Duration: {mins}:{secs:02d}")
+
+        stop_event = threading.Event()
+
+        # Start recorder in background thread
+        recorder_thread = threading.Thread(
+            target=record_track,
+            args=(monitor_source, output_path, track['duration'], stop_event),
+            daemon=True
+        )
+        recorder_thread.start()
+
+        # Small delay so ffmpeg is definitely recording before mpv starts
+        time.sleep(1.5)
+
+        try:
+            play_track(track['url'], stop_event)
+        except KeyboardInterrupt:
+            print("\n[info] Interrupted by user.")
+            stop_event.set()
+            recorder_thread.join(timeout=5)
+            sys.exit(0)
+
+        # Wait for recorder to finish flushing
+        recorder_thread.join(timeout=15)
+
+        size_kb = os.path.getsize(output_path) / 1024 if os.path.exists(output_path) else 0
+        print(f"[done]  Saved {size_kb:.0f} KB → {filename}\n")
+
+        # Brief gap between tracks
+        time.sleep(1)
+
+    print("[info] All tracks recorded!")
+
+
+if __name__ == "__main__":
+    main()
